@@ -1,0 +1,144 @@
+# Local development stack (§25).
+#
+# `docker compose up` from a clean checkout produces the whole working system: the IdP, Postgres,
+# Redis, and the demo relying party and resource server that prove the flow end to end. The intent is
+# parity with the deployed shape (same code, same datastores, same configuration mechanism) while
+# staying comfortable to work in (hot reload, mounted source, an inspectable database).
+
+name: authforge
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: authforge
+      POSTGRES_PASSWORD: authforge
+      POSTGRES_DB: authforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # `pg_isready` alone returns true before the init scripts finish, so the database name is
+      # included: dependent services must not start against a server that has no schema yet.
+      test: ["CMD-SHELL", "pg_isready -U authforge -d authforge"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    # No persistence: everything Redis holds here is short-lived by design (§13), and disabling the
+    # AOF/RDB machinery keeps local runs from accumulating stale sessions between restarts.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: runtime
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      AUTHFORGE_ENVIRONMENT: local
+      AUTHFORGE_ISSUER: http://localhost:8000
+      AUTHFORGE_DATABASE_URL: postgresql+asyncpg://authforge:authforge@postgres:5432/authforge
+      AUTHFORGE_REDIS_URL: redis://redis:6379/0
+      AUTHFORGE_LOG_LEVEL: INFO
+      AUTHFORGE_SESSION_COOKIE_SECURE: "false"
+      AUTHFORGE_SIGNING_KEY_PROVIDER: local
+      AUTHFORGE_LOCAL_KEY_DIRECTORY: /srv/authforge/dev-keys
+      AUTHFORGE_TOTP_ENCRYPTION_KEY: local-development-only-totp-key-0123456789
+      AUTHFORGE_ADMIN_API_TOKEN: local-development-admin-token
+      AUTHFORGE_ACCESS_TOKEN_AUDIENCES: '["authforge-demo-api"]'
+    ports:
+      - "8000:8000"
+    volumes:
+      # Source is mounted so --reload picks up edits without a rebuild.
+      - ./app:/srv/authforge/app
+      - ./migrations:/srv/authforge/migrations
+      # Development signing keys live in a named volume rather than the image or the repo, so they
+      # survive a rebuild and can never be committed.
+      - dev-keys:/srv/authforge/dev-keys
+    user: root
+    command:
+      - sh
+      - -c
+      - |
+        mkdir -p /srv/authforge/dev-keys && chown -R authforge:authforge /srv/authforge/dev-keys
+        # Migrations are run explicitly here (and by `make migrate`) rather than on app boot, so a
+        # schema change is always a visible, intentional step (§25).
+        su authforge -s /bin/sh -c 'alembic upgrade head'
+        exec su authforge -s /bin/sh -c 'uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload'
+
+  demo-rp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: runtime
+    depends_on:
+      app:
+        condition: service_started
+    environment:
+      # The RP runs in the user's browser, so it must reach the IdP at the same origin the browser
+      # does — an in-network hostname would break the redirect.
+      AUTHFORGE_DEMO_ISSUER: http://localhost:8000
+      AUTHFORGE_DEMO_CLIENT_ID: demo-web-client
+      AUTHFORGE_DEMO_CLIENT_SECRET: ${AUTHFORGE_DEMO_CLIENT_SECRET:-}
+      AUTHFORGE_DEMO_RP_URL: http://localhost:8100
+      AUTHFORGE_DEMO_API_URL: http://localhost:8200
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./examples:/srv/authforge/examples
+    network_mode: host
+    command: ["uvicorn", "examples.demo_rp:app", "--host", "0.0.0.0", "--port", "8100"]
+    profiles: ["demo"]
+
+  demo-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: runtime
+    depends_on:
+      app:
+        condition: service_started
+    environment:
+      AUTHFORGE_DEMO_ISSUER: http://localhost:8000
+      AUTHFORGE_DEMO_API_AUDIENCE: authforge-demo-api
+      AUTHFORGE_DEMO_REQUIRED_SCOPE: profile
+    ports:
+      - "8200:8200"
+    volumes:
+      - ./examples:/srv/authforge/examples
+    network_mode: host
+    command:
+      ["uvicorn", "examples.demo_resource_server:app", "--host", "0.0.0.0", "--port", "8200"]
+    profiles: ["demo"]
+
+  pgweb:
+    # Database inspector, so "what does the refresh_tokens table look like right now" is a click
+    # rather than a psql session.
+    image: sosedoff/pgweb:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGWEB_DATABASE_URL: postgres://authforge:authforge@postgres:5432/authforge?sslmode=disable
+    ports:
+      - "8081:8081"
+    profiles: ["tools"]
+
+volumes:
+  postgres-data:
+  dev-keys:
