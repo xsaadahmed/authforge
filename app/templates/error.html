@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Request rejected · AuthForge{% endblock %}
+{% block content %}
+<h1 class="heading">This request was rejected</h1>
+{# Deliberately not a redirect: we reach this page when the client or its redirect URI could
+   not be validated, so there is no URI we are willing to send a browser to. #}
+<p class="alert alert--error" role="alert">
+  <code>{{ error }}</code>
+</p>
+{% if description %}
+<p class="lede">{{ description }}</p>
+{% endif %}
+<p class="footnote footnote--inline">
+  Nothing was shared. If you arrived here from an application, return to it and try again.
+</p>
+{% endblock %}

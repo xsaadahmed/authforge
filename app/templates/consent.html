@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Authorize {{ client.client_name }} · AuthForge{% endblock %}
+{% block content %}
+<h1 class="heading">Authorize {{ client.client_name }}</h1>
+<p class="lede">
+  Signed in as <strong>{{ user_email }}</strong>.
+  {% if client.client_uri %}
+  <a class="link" href="{{ client.client_uri }}" rel="noreferrer noopener">{{ client.client_name }}</a>
+  {% else %}<strong>{{ client.client_name }}</strong>{% endif %}
+  is requesting the following access to your account.
+</p>
+
+{% if error %}
+<p class="alert alert--error" role="alert">{{ error }}</p>
+{% endif %}
+
+<form method="post" action="/consent" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+  <input type="hidden" name="authorize_query" value="{{ authorize_query }}" />
+
+  <ul class="scopes">
+    {% for scope in promptable_scopes %}
+    <li class="scope">
+      {# Every requested scope is submitted back and re-validated server-side against the
+         client's registration; the checkbox is a UI affordance, never the authority. #}
+      <label class="scope__label">
+        <input class="scope__checkbox" type="checkbox" name="scope" value="{{ scope.name }}" checked />
+        <span>
+          <span class="scope__name">{{ scope.name }}</span>
+          <span class="scope__description">{{ scope.description }}</span>
+        </span>
+      </label>
+    </li>
+    {% endfor %}
+    {% for scope in implied_scopes %}
+    <li class="scope scope--implied">
+      <span class="scope__name">{{ scope.name }}</span>
+      <span class="scope__description">{{ scope.description }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <div class="actions">
+    <button class="button button--primary" type="submit" name="decision" value="allow">Allow</button>
+    <button class="button button--secondary" type="submit" name="decision" value="deny">Deny</button>
+  </div>
+</form>
+
+<p class="footnote footnote--inline">
+  You will be returned to <code>{{ redirect_host }}</code> after deciding.
+</p>
+{% endblock %}

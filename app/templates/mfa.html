@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Two-factor authentication · AuthForge{% endblock %}
+{% block content %}
+<h1 class="heading">Two-factor authentication</h1>
+<p class="lede">
+  {% if use_recovery_code %}
+    Enter one of the recovery codes you saved when you set up two-factor authentication.
+  {% else %}
+    Enter the 6-digit code from your authenticator app.
+  {% endif %}
+</p>
+
+{% if error %}
+<p class="alert alert--error" role="alert">{{ error }}</p>
+{% endif %}
+
+<form method="post" action="/mfa" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+  <input type="hidden" name="pending_id" value="{{ pending_id }}" />
+  <input type="hidden" name="use_recovery_code" value="{{ 'true' if use_recovery_code else 'false' }}" />
+
+  <label class="field">
+    <span class="field__label">{{ 'Recovery code' if use_recovery_code else 'Authentication code' }}</span>
+    <input
+      class="field__input field__input--code"
+      type="text"
+      name="code"
+      {% if not use_recovery_code %}inputmode="numeric" pattern="[0-9]*" maxlength="6"{% endif %}
+      autocomplete="one-time-code"
+      autocapitalize="characters"
+      spellcheck="false"
+      required
+      autofocus
+    />
+  </label>
+
+  <button class="button button--primary" type="submit">Verify</button>
+</form>
+
+<form method="get" action="/mfa" class="inline-form">
+  <input type="hidden" name="pending_id" value="{{ pending_id }}" />
+  <input type="hidden" name="use_recovery_code" value="{{ 'false' if use_recovery_code else 'true' }}" />
+  <button class="button button--link" type="submit">
+    {% if use_recovery_code %}Use an authenticator code instead{% else %}Use a recovery code instead{% endif %}
+  </button>
+</form>
+{% endblock %}

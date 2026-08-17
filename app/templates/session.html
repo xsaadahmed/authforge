@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Your session · AuthForge{% endblock %}
+{% block content %}
+<h1 class="heading">You are signed in</h1>
+<p class="lede">
+  Signed in as <strong>{{ user_email }}</strong>{% if mfa_verified %} with two-factor authentication{% endif %}.
+</p>
+<dl class="facts">
+  <dt>Authenticated at</dt><dd>{{ auth_time }}</dd>
+  <dt>Two-factor</dt><dd>{{ 'verified this session' if mfa_verified else ('enrolled' if mfa_enrolled else 'not enrolled') }}</dd>
+</dl>
+<form method="post" action="/logout">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+  <button class="button button--secondary" type="submit">Sign out</button>
+</form>
+{% endblock %}
