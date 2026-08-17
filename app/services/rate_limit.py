@@ -120,9 +120,7 @@ class RateLimitService:
         return verdict
 
 
-def _most_restrictive(
-    verdicts: list[RateLimitVerdict], *, default_limit: int
-) -> RateLimitVerdict:
+def _most_restrictive(verdicts: list[RateLimitVerdict], *, default_limit: int) -> RateLimitVerdict:
     if not verdicts:
         return RateLimitVerdict(
             allowed=True, current_count=0, limit=default_limit, retry_after_seconds=0

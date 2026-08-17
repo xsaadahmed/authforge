@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
+from typing import Any, cast
 
-from sqlalchemy import delete, select
+from sqlalchemy import CursorResult, Result, delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,27 +28,34 @@ class ConsentRepository:
         *,
         user_id: str,
         client_id: str,
-        scopes: Sequence[str],
+        granted_scopes: Sequence[str],
+        considered_scopes: Sequence[str],
         expires_at: datetime | None = None,
     ) -> Consent:
-        """Upsert the granted set.
+        """Upsert both sets for a (user, client) pair.
 
-        The stored set is *replaced*, not unioned, so a consent screen where the user
-        unticks a previously granted scope actually narrows the grant. Union semantics would
-        make consent monotonically expanding and impossible to reduce through the UI.
+        Both are stored verbatim as computed by ``ConsentService``; the merge rules (this request's
+        decision wins for the scopes in this request, earlier grants persist for scopes outside it)
+        are policy and belong in the service, not in SQL.
         """
-        ordered = sorted(dict.fromkeys(scopes))
+        granted = sorted(dict.fromkeys(granted_scopes))
+        considered = sorted(dict.fromkeys(considered_scopes))
         statement = (
             insert(Consent)
             .values(
                 user_id=user_id,
                 client_id=client_id,
-                granted_scopes=ordered,
+                granted_scopes=granted,
+                considered_scopes=considered,
                 expires_at=expires_at,
             )
             .on_conflict_do_update(
                 index_elements=[Consent.user_id, Consent.client_id],
-                set_={"granted_scopes": ordered, "expires_at": expires_at},
+                set_={
+                    "granted_scopes": granted,
+                    "considered_scopes": considered,
+                    "expires_at": expires_at,
+                },
             )
             .returning(Consent)
         )
@@ -58,10 +66,20 @@ class ConsentRepository:
         result = await self._session.execute(
             delete(Consent).where(Consent.user_id == user_id, Consent.client_id == client_id)
         )
-        return result.rowcount or 0
+        return _affected_rows(result)
 
     async def list_for_user(self, user_id: str) -> list[Consent]:
         result = await self._session.execute(
             select(Consent).where(Consent.user_id == user_id).order_by(Consent.created_at)
         )
         return list(result.scalars())
+
+
+def _affected_rows(result: Result[Any]) -> int:
+    """Rows touched by a DML statement.
+
+    ``Session.execute`` is typed as returning ``Result``, but every UPDATE/DELETE returns a
+    ``CursorResult``, the only variant carrying ``rowcount``. The narrowing is explicit here rather
+    than repeated as an ignore comment at each call site.
+    """
+    return cast("CursorResult[Any]", result).rowcount or 0

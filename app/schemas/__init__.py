@@ -6,6 +6,11 @@ clients rather than idiomatic for FastAPI. The admin and account APIs are ours t
 get proper schemas and appear correctly in the generated OpenAPI document.
 """
 
+from app.schemas.account import (
+    MfaConfirmRequest,
+    MfaEnrolmentResponse,
+    RecoveryCodesResponse,
+)
 from app.schemas.admin import (
     ClientResponse,
     CreateClientRequest,
@@ -15,11 +20,6 @@ from app.schemas.admin import (
     ScopeResponse,
     SigningKeyResponse,
     UserResponse,
-)
-from app.schemas.account import (
-    MfaConfirmRequest,
-    MfaEnrolmentResponse,
-    RecoveryCodesResponse,
 )
 
 __all__ = [

@@ -41,9 +41,7 @@ async def issue_token_for_flow(request: Request, container: Container) -> FlowTo
     """Issue a CSRF token for a pre-authentication form, reusing the flow cookie if present."""
     existing = request.cookies.get(FLOW_COOKIE_NAME)
     flow_id = existing or new_flow_id()
-    token = await container.sessions.issue_csrf_token(
-        flow_id, ttl_seconds=_FLOW_CSRF_TTL_SECONDS
-    )
+    token = await container.sessions.issue_csrf_token(flow_id, ttl_seconds=_FLOW_CSRF_TTL_SECONDS)
     return FlowToken(token=token, flow_id=flow_id, is_new_flow=existing is None)
 
 

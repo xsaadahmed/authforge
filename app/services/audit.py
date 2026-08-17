@@ -2,17 +2,30 @@
 
 Every event goes to three places with different guarantees:
 
-* a **structured log line** (always, redacted, correlated by request ID) — the fast path an
-  investigator greps;
-* a **CloudWatch metric** via EMF for the events worth alarming on;
-* a **Postgres row** for durable, queryable history.
+* a **structured log line** — always, redacted, correlated by request ID; the fast path an
+  investigator greps and the one that cannot fail;
+* a **CloudWatch metric** via EMF, for the events worth alarming on;
+* a **Postgres row**, for durable, queryable history.
 
-The trade-off called out in §12/§21 is resolved explicitly here. ``record`` uses its own
-short transaction and swallows database errors, so a failure of the audit table can never
-deny a legitimate authentication. ``record_in_transaction`` joins the caller's transaction and
-does *not* swallow, for the cases where the audit record and the state change must be
-all-or-nothing — refresh-token reuse being the important one: "we revoked the family" and "we
-recorded why" must not be separable.
+The §12/§21 trade-off — "audit writes should not block the primary operation, but should be atomic
+with it where feasible" — is resolved by offering three explicitly different persistence modes
+rather than one compromise:
+
+``record``
+    Writes inside the caller's transaction but wrapped in a SAVEPOINT, so a failure of the audit
+    insert rolls back only itself and the authentication proceeds. Commits when the caller commits.
+    This is the default and it borrows no extra database connection.
+
+``record_in_transaction``
+    Writes inside the caller's transaction with no savepoint, so the event and the state change are
+    genuinely all-or-nothing. Used where "we did X" and "we recorded why we did X" must not be
+    separable.
+
+``record_durable``
+    Writes and commits in its own transaction. Used on paths that are *about* to fail the request:
+    a rejected authorization, a rate-limited login, a detected token replay. Those all end in a
+    rolled-back request transaction, so an event recorded any other way would vanish exactly when it
+    matters most.
 """
 
 from __future__ import annotations
@@ -31,7 +44,7 @@ from app.repositories.audit_repository import AuditRepository
 
 logger = get_logger("authforge.audit")
 
-# Events that get a CloudWatch metric, because an alarm or a dashboard is built on them.
+# Events that also get a CloudWatch metric, because a dashboard or an alarm is built on them.
 _METRIC_EVENTS = frozenset(
     {
         AuditEventType.LOGIN_SUCCESS,
@@ -57,6 +70,7 @@ class AuditService:
 
     async def record(
         self,
+        session: AsyncSession,
         event_type: AuditEventType,
         *,
         success: bool = True,
@@ -65,7 +79,7 @@ class AuditService:
         subject_hint: str | None = None,
         detail: dict[str, Any] | None = None,
     ) -> None:
-        """Emit an event on its own transaction; never raises."""
+        """Record inside the caller's transaction, protected by a SAVEPOINT. Never raises."""
         context = self._log_and_measure(
             event_type,
             success=success,
@@ -75,14 +89,10 @@ class AuditService:
             detail=detail,
         )
         try:
-            async with self._database.session() as session:
+            async with session.begin_nested():
                 await AuditRepository(session).record(**context)
         except Exception:
-            logger.error(
-                "audit event could not be persisted",
-                extra={"event_type": str(event_type), "degraded": True},
-                exc_info=True,
-            )
+            self._report_write_failure(event_type)
             if self._settings.audit_failures_are_fatal:
                 raise
 
@@ -97,7 +107,7 @@ class AuditService:
         subject_hint: str | None = None,
         detail: dict[str, Any] | None = None,
     ) -> None:
-        """Emit an event inside the caller's transaction; propagates database errors."""
+        """Record inside the caller's transaction with no savepoint; propagates failures."""
         context = self._log_and_measure(
             event_type,
             success=success,
@@ -107,6 +117,48 @@ class AuditService:
             detail=detail,
         )
         await AuditRepository(session).record(**context)
+
+    async def record_durable(
+        self,
+        event_type: AuditEventType,
+        *,
+        success: bool = False,
+        user_id: str | None = None,
+        client_id: str | None = None,
+        subject_hint: str | None = None,
+        detail: dict[str, Any] | None = None,
+    ) -> None:
+        """Record and commit in a dedicated transaction. Never raises.
+
+        For events on a request that is about to fail: the caller's transaction will be rolled back,
+        and a rejected authorization or a detected replay is precisely the event an investigator
+        needs to still be there afterwards.
+        """
+        context = self._log_and_measure(
+            event_type,
+            success=success,
+            user_id=user_id,
+            client_id=client_id,
+            subject_hint=subject_hint,
+            detail=detail,
+        )
+        try:
+            async with self._database.session() as own_session:
+                await AuditRepository(own_session).record(**context)
+        except Exception:
+            self._report_write_failure(event_type)
+            if self._settings.audit_failures_are_fatal:
+                raise
+
+    def _report_write_failure(self, event_type: AuditEventType) -> None:
+        # The log line above already carries the event, so an investigator still sees it even when
+        # the durable copy could not be written. `degraded` makes the gap queryable.
+        logger.error(
+            "audit event could not be persisted",
+            extra={"event_type": str(event_type), "degraded": True},
+            exc_info=True,
+        )
+        get_metrics().count("AuditWriteFailure")
 
     def _log_and_measure(
         self,
@@ -126,6 +178,8 @@ class AuditService:
                 "event": str(event_type),
                 "outcome": "success" if success else "failure",
                 "user_id": user_id,
+                # Not `client_id`: LogRecord already has attributes we must not collide with, and a
+                # distinct name keeps OAuth clients separable from other identifiers in queries.
                 "oauth_client_id": client_id,
                 "detail": safe_detail,
             },

@@ -44,15 +44,21 @@ _SENSITIVE_KEYS = frozenset(
 )
 
 # Catches secrets that arrive embedded in a formatted message string rather than as a field.
+# Ordered most-specific first: a bearer credential or a JWT is recognised by its own shape before
+# the generic `key=value` sweep gets to it.
 _INLINE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._\-]+"), "Bearer ***"),
+    (re.compile(r"\beyJ[A-Za-z0-9._\-]{10,}"), "<jwt-redacted>"),
     (
+        # The optional quote before the separator matters: a secret logged as part of a JSON
+        # fragment appears as `"client_secret": "value"`, not `client_secret=value`.
         re.compile(
-            r"(?i)\b(" + "|".join(sorted(_SENSITIVE_KEYS)) + r")\b\s*[=:]\s*[\"']?([^\s\"',}&]+)"
+            r"(?i)\b("
+            + "|".join(sorted(_SENSITIVE_KEYS))
+            + r")\b[\"']?\s*[=:]\s*[\"']?([^\s\"',}&]+)"
         ),
         r"\1=***",
     ),
-    (re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._\-]+"), "Bearer ***"),
-    (re.compile(r"\beyJ[A-Za-z0-9._\-]{10,}"), "<jwt-redacted>"),
 )
 
 _RESERVED_RECORD_ATTRS = frozenset(
@@ -129,7 +135,9 @@ class JsonFormatter(logging.Formatter):
         for key, value in record.__dict__.items():
             if key in _RESERVED_RECORD_ATTRS or key.startswith("_") or key in payload:
                 continue
-            payload[key] = redact_value(value)
+            # A sensitive *name* is enough to redact: `extra={"refresh_token": ...}` arrives here as
+            # a bare string with no surrounding context for the inline patterns to recognise.
+            payload[key] = REDACTED if key.lower() in _SENSITIVE_KEYS else redact_value(value)
         if record.exc_info:
             payload["exception"] = redact_text(self.formatException(record.exc_info))
         return json.dumps(payload, default=str, separators=(",", ":"))

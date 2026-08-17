@@ -40,9 +40,7 @@ async def revoke(
     # revoke another's tokens. A failure here does raise, unlike an unknown token.
     client = await container.clients.authenticate(db, credentials)
 
-    await container.tokens.revoke(
-        db, client=client, token=token, token_type_hint=token_type_hint
-    )
+    await container.tokens.revoke(db, client=client, token=token, token_type_hint=token_type_hint)
 
     response.status_code = status.HTTP_200_OK
     response.headers["Cache-Control"] = "no-store"

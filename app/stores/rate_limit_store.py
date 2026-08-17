@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from typing import Any
 
 from redis.asyncio.client import Redis
 from redis.commands.core import AsyncScript
@@ -120,12 +121,14 @@ class RateLimitStore:
         await self._redis.delete(key)
 
     @staticmethod
-    def _to_verdict(raw: object, limit: int) -> RateLimitVerdict:
-        allowed_raw, count_raw, retry_ms_raw = tuple(raw)  # type: ignore[arg-type]
-        retry_seconds = max(1, int((int(retry_ms_raw) + 999) // 1000)) if int(retry_ms_raw) else 0
+    def _to_verdict(raw: Any, limit: int) -> RateLimitVerdict:
+        # The Lua script returns {allowed, count, retry_after_ms}; Redis renders Lua numbers as
+        # integers, so the three positions are parsed rather than trusted as types.
+        allowed_raw, count_raw, retry_ms_raw = (int(value) for value in tuple(raw)[:3])
+        retry_seconds = max(1, (retry_ms_raw + 999) // 1000) if retry_ms_raw else 0
         return RateLimitVerdict(
-            allowed=bool(int(allowed_raw)),
-            current_count=int(count_raw),
+            allowed=bool(allowed_raw),
+            current_count=count_raw,
             limit=limit,
             retry_after_seconds=retry_seconds,
         )

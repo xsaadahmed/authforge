@@ -125,9 +125,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         )
         headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
         if self._settings.is_deployed:
-            headers.setdefault(
-                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
-            )
+            headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         if _is_sensitive(request.url.path):
             # Keeps an authorization code or a rendered consent screen out of shared caches and
             # the browser's back-button cache.

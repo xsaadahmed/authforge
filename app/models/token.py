@@ -19,7 +19,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import Text
 
-from app.models.base import Base, ULID_LENGTH, ulid_pk
+from app.models.base import ULID_LENGTH, Base, ulid_pk
 
 
 class RevocationReason(StrEnum):

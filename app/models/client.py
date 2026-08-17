@@ -15,7 +15,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin, ULID_LENGTH, ulid_pk
+from app.models.base import ULID_LENGTH, Base, TimestampMixin, ulid_pk
 
 
 class ClientType(StrEnum):

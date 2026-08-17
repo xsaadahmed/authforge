@@ -23,9 +23,7 @@ def register_error_handlers(app: FastAPI) -> None:
     async def _oauth_error(request: Request, exc: OAuthError) -> Response:
         # RFC 6749 §5.2 / RFC 6750 §3: the body carries `error`, and the exception decides the
         # status and any WWW-Authenticate challenge.
-        return JSONResponse(
-            status_code=exc.status_code, content=exc.to_dict(), headers=exc.headers
-        )
+        return JSONResponse(status_code=exc.status_code, content=exc.to_dict(), headers=exc.headers)
 
     @app.exception_handler(AuthorizationRequestError)
     async def _authorization_request_error(

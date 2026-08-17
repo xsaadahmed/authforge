@@ -68,22 +68,27 @@ def build_container(settings: Settings) -> Container:
     clients = ClientService(settings=settings)
     consent = ConsentService(settings=settings, audit=audit)
 
-    # Redis-backed collaborators resolve `redis_provider.client` lazily via property access, so
-    # they can be constructed before the connection pool exists.
+    # Redis-backed collaborators receive a lazy proxy, so they can be constructed here, before the
+    # connection pool exists (see RedisProvider.lazy_client).
     auth_codes = AuthCodeStore(
-        _LazyRedis(redis_provider), ttl_seconds=settings.authorization_code_ttl_seconds
+        redis_provider.lazy_client(), ttl_seconds=settings.authorization_code_ttl_seconds
     )
     sessions = SessionStore(
-        _LazyRedis(redis_provider),
+        redis_provider.lazy_client(),
         session_ttl_seconds=settings.session_ttl_seconds,
         pending_mfa_ttl_seconds=settings.pending_mfa_ttl_seconds,
     )
-    denylist = TokenDenylistStore(_LazyRedis(redis_provider))
-    rate_limit_store = RateLimitStore(_LazyRedis(redis_provider))
+    denylist = TokenDenylistStore(redis_provider.lazy_client())
+    rate_limit_store = RateLimitStore(redis_provider.lazy_client())
     rate_limits = RateLimitService(settings=settings, store=rate_limit_store)
 
     tokens = TokenService(
-        settings=settings, keys=keys, auth_codes=auth_codes, denylist=denylist, audit=audit
+        settings=settings,
+        database=database,
+        keys=keys,
+        auth_codes=auth_codes,
+        denylist=denylist,
+        audit=audit,
     )
     authorization = AuthorizationService(
         settings=settings, clients=clients, auth_codes=auth_codes, audit=audit
@@ -128,19 +133,3 @@ async def startup(container: Container, *, ensure_signing_key: bool = True) -> N
 async def shutdown(container: Container) -> None:
     await container.redis.disconnect()
     await container.database.disconnect()
-
-
-class _LazyRedis:
-    """Forwards attribute access to the provider's live client.
-
-    Lets stores be constructed at import/composition time while the connection pool is created
-    during startup, without every store having to carry a ``connect()`` step of its own.
-    """
-
-    __slots__ = ("_provider",)
-
-    def __init__(self, provider: RedisProvider) -> None:
-        self._provider = provider
-
-    def __getattr__(self, item: str) -> object:
-        return getattr(self._provider.client, item)

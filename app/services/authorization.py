@@ -107,9 +107,7 @@ class AuthorizationService:
             # No defaulting to "the only registered URI". Requiring it explicitly means the
             # value bound into the code is always the one the client actually asked for.
             await self._audit_failure(client_id=client_id, reason="missing_redirect_uri")
-            raise self._unredirectable(
-                OAuthErrorCode.INVALID_REQUEST, "redirect_uri is required"
-            )
+            raise self._unredirectable(OAuthErrorCode.INVALID_REQUEST, "redirect_uri is required")
         matched = self._clients.match_redirect_uri(client, redirect_uri)
         if matched is None:
             await self._audit_failure(client_id=client_id, reason="redirect_uri_not_registered")
@@ -192,9 +190,7 @@ class AuthorizationService:
             raw_query=raw_query,
         )
 
-    def requires_reauthentication(
-        self, request: AuthorizationRequest, *, auth_time: int
-    ) -> bool:
+    def requires_reauthentication(self, request: AuthorizationRequest, *, auth_time: int) -> bool:
         """Whether an existing session is too old for this request.
 
         Honours both ``prompt=login`` (client insists on a fresh authentication) and ``max_age``
@@ -209,6 +205,7 @@ class AuthorizationService:
 
     async def issue_code(
         self,
+        session: AsyncSession,
         request: AuthorizationRequest,
         *,
         user_id: str,
@@ -232,6 +229,7 @@ class AuthorizationService:
             )
         )
         await self._audit.record(
+            session,
             AuditEventType.AUTHZ_CODE_ISSUED,
             user_id=user_id,
             client_id=request.client.client_id,
@@ -260,9 +258,10 @@ class AuthorizationService:
         return _append_query(redirect_uri, params)
 
     async def _audit_failure(self, *, client_id: str | None, reason: str) -> None:
-        await self._audit.record(
+        """Recorded durably: every caller of this raises, so the request transaction is
+        discarded."""
+        await self._audit.record_durable(
             AuditEventType.AUTHZ_FAILURE,
-            success=False,
             client_id=client_id,
             detail={"stage": "authorize", "reason": reason},
         )

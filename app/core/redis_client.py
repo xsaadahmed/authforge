@@ -7,6 +7,8 @@ enough to exhaust the ECS task's worker capacity.
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import redis.asyncio as redis
 from redis.asyncio.client import Redis
 
@@ -49,9 +51,29 @@ class RedisProvider:
             raise RuntimeError("redis not connected; call connect() during startup")
         return self._client
 
+    def lazy_client(self) -> Redis:
+        """A proxy that resolves to the live client on every attribute access.
+
+        Lets the stores be constructed at composition time while the connection pool is created
+        during startup, without giving every store a ``connect()`` step of its own. The cast is
+        the single place this indirection is asserted: the proxy forwards everything to a real
+        client, so it satisfies the same interface at runtime.
+        """
+        return cast("Redis", _LazyRedisProxy(self))
+
     async def healthcheck(self) -> bool:
         try:
             return bool(await self.client.ping())
         except Exception:
             logger.warning("redis healthcheck failed", exc_info=True)
             return False
+
+
+class _LazyRedisProxy:
+    __slots__ = ("_provider",)
+
+    def __init__(self, provider: RedisProvider) -> None:
+        self._provider = provider
+
+    def __getattr__(self, item: str) -> Any:
+        return getattr(self._provider.client, item)

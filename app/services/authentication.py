@@ -114,6 +114,7 @@ class AuthenticationService:
         )
         if not verdict.allowed:
             await self._audit.record(
+                db,
                 AuditEventType.RATE_LIMIT_EXCEEDED,
                 success=False,
                 subject_hint=identifier,
@@ -147,6 +148,7 @@ class AuthenticationService:
                         detail={"failed_attempts": count},
                     )
             await self._audit.record(
+                db,
                 AuditEventType.LOGIN_FAILURE,
                 success=False,
                 user_id=user.id if user else None,
@@ -157,6 +159,7 @@ class AuthenticationService:
 
         if not user.is_active:
             await self._audit.record(
+                db,
                 AuditEventType.LOGIN_FAILURE,
                 success=False,
                 user_id=user.id,
@@ -168,6 +171,7 @@ class AuthenticationService:
         # exists, and so a lockout cannot be triggered by guessing usernames alone.
         if user.locked_until is not None and user.locked_until > datetime.now(tz=UTC):
             await self._audit.record(
+                db,
                 AuditEventType.LOGIN_FAILURE,
                 success=False,
                 user_id=user.id,
@@ -198,7 +202,7 @@ class AuthenticationService:
                 )
             )
             await self._audit.record(
-                AuditEventType.MFA_CHALLENGE_ISSUED, user_id=user.id, detail={"factor": "totp"}
+                db, AuditEventType.MFA_CHALLENGE_ISSUED, user_id=user.id, detail={"factor": "totp"}
             )
             return LoginOutcome(
                 result=LoginResult.MFA_REQUIRED, pending_mfa_id=pending_id, user_id=user.id
@@ -210,11 +214,9 @@ class AuthenticationService:
             pending_authorize_query=pending_authorize_query,
         )
         await self._audit.record(
-            AuditEventType.LOGIN_SUCCESS, user_id=user.id, detail={"mfa": False}
+            db, AuditEventType.LOGIN_SUCCESS, user_id=user.id, detail={"mfa": False}
         )
-        return LoginOutcome(
-            result=LoginResult.SUCCESS, session_id=session_id, user_id=user.id
-        )
+        return LoginOutcome(result=LoginResult.SUCCESS, session_id=session_id, user_id=user.id)
 
     # ------------------------------------------------------------------ MFA challenge
     async def verify_mfa_challenge(
@@ -237,9 +239,10 @@ class AuthenticationService:
         )
         if not verdict.allowed:
             await self._sessions.delete_pending_mfa(pending_mfa_id)
-            await self._audit.record(
+            # Durable: the handler raises RateLimitedError, so the request transaction is about to
+            # be rolled back and this is exactly the event worth keeping.
+            await self._audit.record_durable(
                 AuditEventType.MFA_FAILURE,
-                success=False,
                 user_id=pending.user_id,
                 detail={"reason": "too_many_attempts"},
             )
@@ -258,6 +261,7 @@ class AuthenticationService:
         )
         if not verified:
             await self._audit.record(
+                db,
                 AuditEventType.MFA_FAILURE,
                 success=False,
                 user_id=user.id,
@@ -271,9 +275,9 @@ class AuthenticationService:
             mfa_verified=True,
             pending_authorize_query=pending.pending_authorize_query,
         )
-        await self._audit.record(AuditEventType.MFA_SUCCESS, user_id=user.id)
+        await self._audit.record(db, AuditEventType.MFA_SUCCESS, user_id=user.id)
         await self._audit.record(
-            AuditEventType.LOGIN_SUCCESS, user_id=user.id, detail={"mfa": True}
+            db, AuditEventType.LOGIN_SUCCESS, user_id=user.id, detail={"mfa": True}
         )
         return LoginOutcome(result=LoginResult.SUCCESS, session_id=session_id, user_id=user.id)
 
@@ -286,9 +290,7 @@ class AuthenticationService:
         except DecryptionError:
             # Means the deployment's TOTP key changed without re-enrolling users. Loud, because
             # silently failing MFA looks identical to a user typing the wrong code.
-            logger.error(
-                "stored TOTP secret could not be decrypted", extra={"user_id": user.id}
-            )
+            logger.error("stored TOTP secret could not be decrypted", extra={"user_id": user.id})
             return False
         if not totp_lib.verify_code(secret=secret, code=code):
             return False
@@ -339,19 +341,19 @@ class AuthenticationService:
             return None
         return await self._sessions.get(session_id)
 
-    async def logout(self, session_id: str | None, *, user_id: str | None = None) -> None:
+    async def logout(
+        self, db: AsyncSession, session_id: str | None, *, user_id: str | None = None
+    ) -> None:
         if session_id:
             await self._sessions.delete(session_id)
-        await self._audit.record(AuditEventType.LOGOUT, user_id=user_id)
+        await self._audit.record(db, AuditEventType.LOGOUT, user_id=user_id)
 
     async def clear_pending_authorize(self, session_id: str, state: SessionState) -> None:
         state.pending_authorize_query = None
         await self._sessions.replace(session_id, state)
 
     # ------------------------------------------------------------------ MFA enrolment
-    async def begin_mfa_enrolment(
-        self, db: AsyncSession, *, user_id: str
-    ) -> MfaEnrolmentChallenge:
+    async def begin_mfa_enrolment(self, db: AsyncSession, *, user_id: str) -> MfaEnrolmentChallenge:
         """Stage a TOTP secret. It is inert until confirmed with a live code."""
         users = UserRepository(db)
         user = await users.get_by_id(user_id)

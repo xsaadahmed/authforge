@@ -220,6 +220,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.String(length=26), nullable=False),
         sa.Column("client_id", sa.String(length=26), nullable=False),
         sa.Column("granted_scopes", postgresql.ARRAY(sa.Text()), nullable=False),
+        sa.Column("considered_scopes", postgresql.ARRAY(sa.Text()), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "created_at",

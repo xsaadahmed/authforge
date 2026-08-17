@@ -77,9 +77,7 @@ async def create_client(
     response_model=RotateSecretResponse,
     summary="Rotate a confidential client's secret",
 )
-async def rotate_secret(
-    client_id: str, container: ContainerDep, db: DbDep
-) -> RotateSecretResponse:
+async def rotate_secret(client_id: str, container: ContainerDep, db: DbDep) -> RotateSecretResponse:
     secret = await container.clients.rotate_client_secret(db, client_id=client_id)
     await container.audit.record_in_transaction(
         db, AuditEventType.CLIENT_UPDATED, client_id=client_id, detail={"action": "rotate_secret"}
@@ -161,19 +159,19 @@ async def create_user(
 
 
 @router.get("/keys", response_model=list[SigningKeyResponse], summary="List signing keys")
-async def list_keys(container: ContainerDep) -> list[SigningKeyResponse]:
+async def list_keys(container: ContainerDep, db: DbDep) -> list[SigningKeyResponse]:
     return [
         SigningKeyResponse(kid=key.kid, algorithm=key.algorithm, status=key.status)
-        for key in await container.keys.list_keys()
+        for key in await container.keys.list_keys(db)
     ]
 
 
 @router.post(
     "/keys/rotate", response_model=SigningKeyResponse, summary="Rotate the signing key now"
 )
-async def rotate_key(container: ContainerDep) -> SigningKeyResponse:
+async def rotate_key(container: ContainerDep, db: DbDep) -> SigningKeyResponse:
     kid = await container.keys.rotate(reason="admin_api")
-    await container.audit.record(AuditEventType.KEY_ROTATED, detail={"kid": kid})
+    await container.audit.record(db, AuditEventType.KEY_ROTATED, detail={"kid": kid})
     return SigningKeyResponse(kid=kid, algorithm="RS256", status="current")
 
 

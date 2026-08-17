@@ -22,7 +22,7 @@ from app.stores.session_store import SessionState
 
 def get_container(request: Request) -> Container:
     container = getattr(request.app.state, "container", None)
-    if container is None:  # pragma: no cover - indicates a broken startup
+    if not isinstance(container, Container):  # pragma: no cover - indicates a broken startup
         raise RuntimeError("application container is not initialised")
     return container
 

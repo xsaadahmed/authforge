@@ -39,9 +39,7 @@ async def begin_enrolment(
     )
 
 
-@router.post(
-    "/mfa/confirm", response_model=RecoveryCodesResponse, summary="Confirm TOTP enrolment"
-)
+@router.post("/mfa/confirm", response_model=RecoveryCodesResponse, summary="Confirm TOTP enrolment")
 async def confirm_enrolment(
     payload: MfaConfirmRequest,
     container: ContainerDep,

@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 from redis.asyncio.client import Redis
 
 from app.security.random_tokens import hash_token, new_opaque_token
+from app.stores.serialization import as_text
 
 _SESSION_PREFIX = "session:"
 _PENDING_MFA_PREFIX = "pending_mfa:"
@@ -89,7 +90,7 @@ class SessionStore:
         if raw is None:
             return None
         try:
-            return SessionState.from_json(raw)
+            return SessionState.from_json(as_text(raw))
         except (json.JSONDecodeError, TypeError, ValueError):
             await self.delete(session_id)
             return None
@@ -122,9 +123,7 @@ class SessionStore:
     # ------------------------------------------------------------------ pending MFA
     async def create_pending_mfa(self, state: PendingMfaState) -> str:
         pending_id = new_opaque_token()
-        await self._redis.set(
-            self._pending_key(pending_id), state.to_json(), ex=self._pending_ttl
-        )
+        await self._redis.set(self._pending_key(pending_id), state.to_json(), ex=self._pending_ttl)
         return pending_id
 
     async def get_pending_mfa(self, pending_id: str) -> PendingMfaState | None:
@@ -132,7 +131,7 @@ class SessionStore:
         if raw is None:
             return None
         try:
-            return PendingMfaState.from_json(raw)
+            return PendingMfaState.from_json(as_text(raw))
         except (json.JSONDecodeError, TypeError, ValueError):
             await self.delete_pending_mfa(pending_id)
             return None
@@ -158,7 +157,7 @@ class SessionStore:
 
     async def get_csrf_token(self, session_id: str) -> str | None:
         value = await self._redis.get(self._csrf_key(session_id))
-        return str(value) if value is not None else None
+        return as_text(value) if value is not None else None
 
     # ------------------------------------------------------------------ TOTP replay
     async def mark_totp_code_used(self, key: str, *, ttl_seconds: int) -> bool:

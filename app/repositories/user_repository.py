@@ -6,7 +6,7 @@ import unicodedata
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import case, func, select, update
+from sqlalchemy import case, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -183,8 +183,6 @@ class UserRepository:
     # ------------------------------------------------------------------ recovery codes
     async def replace_recovery_codes(self, *, user_id: str, code_hashes: Sequence[str]) -> None:
         """Issuing a new set invalidates the old set — codes are never additive."""
-        from sqlalchemy import delete
-
         await self._session.execute(delete(RecoveryCode).where(RecoveryCode.user_id == user_id))
         for code_hash in code_hashes:
             self._session.add(RecoveryCode(user_id=user_id, code_hash=code_hash))

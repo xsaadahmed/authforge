@@ -20,8 +20,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
+from typing import Any, cast
 
-from sqlalchemy import func, select, update
+from sqlalchemy import CursorResult, Result, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.token import RefreshToken, RevocationReason
@@ -59,9 +60,7 @@ class RefreshTokenRepository:
         await self._session.flush()
         return token
 
-    async def claim_for_rotation(
-        self, *, token_hash: str, client_id: str
-    ) -> RefreshToken | None:
+    async def claim_for_rotation(self, *, token_hash: str, client_id: str) -> RefreshToken | None:
         """Atomically mark a token used and return it, or return None if unclaimable.
 
         ``client_id`` is part of the WHERE clause rather than checked afterwards. If it were
@@ -98,9 +97,7 @@ class RefreshTokenRepository:
         )
         return result.scalars().one_or_none()
 
-    async def revoke_family(
-        self, family_id: str, *, reason: RevocationReason
-    ) -> int:
+    async def revoke_family(self, family_id: str, *, reason: RevocationReason) -> int:
         """Revoke every token in a family. Returns the number of rows affected.
 
         Applied to *all* generations including already-used ones, so the family's history is
@@ -112,7 +109,7 @@ class RefreshTokenRepository:
             .values(revoked=True, revoked_at=func.now(), revocation_reason=str(reason))
         )
         result = await self._session.execute(statement)
-        return result.rowcount or 0
+        return _affected_rows(result)
 
     async def revoke_all_for_user(self, user_id: str, *, reason: RevocationReason) -> int:
         statement = (
@@ -121,7 +118,7 @@ class RefreshTokenRepository:
             .values(revoked=True, revoked_at=func.now(), revocation_reason=str(reason))
         )
         result = await self._session.execute(statement)
-        return result.rowcount or 0
+        return _affected_rows(result)
 
     async def revoke_all_for_client(self, client_id: str, *, reason: RevocationReason) -> int:
         statement = (
@@ -130,7 +127,7 @@ class RefreshTokenRepository:
             .values(revoked=True, revoked_at=func.now(), revocation_reason=str(reason))
         )
         result = await self._session.execute(statement)
-        return result.rowcount or 0
+        return _affected_rows(result)
 
     async def revoke_for_user_and_client(
         self, *, user_id: str, client_id: str, reason: RevocationReason
@@ -145,7 +142,7 @@ class RefreshTokenRepository:
             .values(revoked=True, revoked_at=func.now(), revocation_reason=str(reason))
         )
         result = await self._session.execute(statement)
-        return result.rowcount or 0
+        return _affected_rows(result)
 
     async def list_family(self, family_id: str) -> list[RefreshToken]:
         result = await self._session.execute(
@@ -174,9 +171,17 @@ class RefreshTokenRepository:
         Expired rows are kept for a while after expiry so reuse detection still has history
         to reason about; only rows past ``older_than`` are removed.
         """
-        from sqlalchemy import delete
-
         result = await self._session.execute(
             delete(RefreshToken).where(RefreshToken.expires_at < older_than)
         )
-        return result.rowcount or 0
+        return _affected_rows(result)
+
+
+def _affected_rows(result: Result[Any]) -> int:
+    """Rows touched by a DML statement.
+
+    ``Session.execute`` is typed as returning ``Result``, but every UPDATE/DELETE returns a
+    ``CursorResult``, the only variant carrying ``rowcount``. The narrowing is explicit here rather
+    than repeated as an ignore comment at each call site.
+    """
+    return cast("CursorResult[Any]", result).rowcount or 0

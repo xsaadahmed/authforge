@@ -29,12 +29,10 @@ from app.repositories.scope_repository import ScopeRepository
 from app.repositories.user_repository import UserRepository
 from app.security.random_tokens import hash_token
 from app.services.authorization import AuthorizationRequest, AuthorizationService
+from app.services.consent import IMPLIED_SCOPES
 from app.stores.session_store import SessionState
 
 router = APIRouter(tags=["oauth2"])
-
-# Scopes displayed as context on the consent screen rather than as an individual choice.
-_IMPLIED_SCOPES = frozenset({"openid"})
 
 
 @router.get("/authorize", summary="OAuth 2.0 authorization endpoint")
@@ -98,7 +96,10 @@ async def authorize(
     assert session_state is not None  # noqa: S101 - narrowed by `needs_login` above
 
     decision = await container.consent.evaluate(
-        db, user_id=session_state.user_id, client=validated.client, requested_scopes=validated.scopes
+        db,
+        user_id=session_state.user_id,
+        client=validated.client,
+        requested_scopes=validated.scopes,
     )
     force_consent = "consent" in validated.prompts
     if decision.consent_required or force_consent:
@@ -119,12 +120,25 @@ async def authorize(
             raw_query=raw_query,
         )
 
+    if validated.scopes and not decision.effective_scopes:
+        # The user has seen every requested scope and approved none of them. Re-prompting would be a
+        # loop that ignores their answer, so the client is told the request was refused.
+        return _redirect_error(
+            redirect_uri=validated.redirect_uri,
+            error=OAuthErrorCode.ACCESS_DENIED,
+            description="the user has not granted any of the requested scopes",
+            state=validated.state,
+        )
+
+    # The code carries the *effective* scopes, so a scope the user declined can never reach a token
+    # even though the client kept asking for it.
     code = await authorization.issue_code(
+        db,
         validated,
         user_id=session_state.user_id,
         auth_time=session_state.auth_time,
         session_id=_session_reference(session_id),
-        granted_scopes=validated.scopes,
+        granted_scopes=decision.effective_scopes,
     )
     return RedirectResponse(
         url=authorization.build_success_redirect(validated, code=code),
@@ -151,12 +165,12 @@ async def _render_consent(
     promptable = [
         {"name": name, "description": catalogue.get(name, name)}
         for name in validated.scopes
-        if name not in _IMPLIED_SCOPES
+        if name not in IMPLIED_SCOPES
     ]
     implied = [
         {"name": name, "description": catalogue.get(name, name)}
         for name in validated.scopes
-        if name in _IMPLIED_SCOPES
+        if name in IMPLIED_SCOPES
     ]
 
     token = await csrf.issue_token_for_session(container, session_id) if session_id else ""

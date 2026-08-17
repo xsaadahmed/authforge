@@ -7,6 +7,8 @@ per user per time step (replay protection).
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pyotp
 
 from app.security.random_tokens import hash_token
@@ -37,14 +39,22 @@ def verify_code(*, secret: str, code: str, at_timestamp: int | None = None) -> b
         return False
     totp = pyotp.TOTP(secret, digits=TOTP_DIGITS, interval=TOTP_PERIOD_SECONDS)
     if at_timestamp is not None:
-        return bool(totp.verify(cleaned, for_time=at_timestamp, valid_window=TOTP_VALID_WINDOW))
+        return bool(
+            totp.verify(
+                cleaned,
+                for_time=datetime.fromtimestamp(at_timestamp, tz=UTC),
+                valid_window=TOTP_VALID_WINDOW,
+            )
+        )
     return bool(totp.verify(cleaned, valid_window=TOTP_VALID_WINDOW))
 
 
 def current_code(secret: str, at_timestamp: int | None = None) -> str:
     """Only used by tests and the enrolment confirmation flow's own self-check."""
     totp = pyotp.TOTP(secret, digits=TOTP_DIGITS, interval=TOTP_PERIOD_SECONDS)
-    return totp.at(at_timestamp) if at_timestamp is not None else totp.now()
+    if at_timestamp is None:
+        return str(totp.now())
+    return str(totp.at(datetime.fromtimestamp(at_timestamp, tz=UTC)))
 
 
 def replay_key(*, user_id: str, code: str) -> str:

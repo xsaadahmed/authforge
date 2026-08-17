@@ -104,7 +104,10 @@ class ClientService:
                 )
             return client
 
-        if method == TokenEndpointAuthMethod.CLIENT_SECRET_BASIC and not credentials.used_basic_auth:
+        if (
+            method == TokenEndpointAuthMethod.CLIENT_SECRET_BASIC
+            and not credentials.used_basic_auth
+        ):
             raise InvalidClientError(
                 "client must authenticate with HTTP Basic",
                 used_basic_auth=credentials.used_basic_auth,
@@ -173,7 +176,9 @@ class ClientService:
             if host not in _ALLOWED_INSECURE_HOSTS:
                 raise DomainError(f"redirect_uri must use https (loopback excepted): {uri}")
             if self._settings.is_deployed:
-                raise DomainError(f"loopback redirect_uri is not permitted in this environment: {uri}")
+                raise DomainError(
+                    f"loopback redirect_uri is not permitted in this environment: {uri}"
+                )
         elif parsed.scheme != "https" and "." not in parsed.scheme:
             # A private-use scheme (RFC 8252 §7.1) must be reverse-DNS, e.g. com.example.app.
             raise DomainError(f"custom redirect_uri scheme must be reverse-DNS: {uri}")

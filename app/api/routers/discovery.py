@@ -84,14 +84,16 @@ async def openid_configuration(
 
 
 @router.get("/.well-known/jwks.json", summary="JSON Web Key Set")
-async def jwks(container: ContainerDep, response: Response) -> dict[str, list[dict[str, Any]]]:
+async def jwks(
+    container: ContainerDep, db: DbDep, response: Response
+) -> dict[str, list[dict[str, Any]]]:
     """Publish the `current` key plus any `retiring` key still inside its grace period.
 
     Cached for the same short window the server caches key metadata internally, so a client's
     cache cannot outlive the server's own view by much — that bound is what makes rotation safe
     without a coordinated flush.
     """
-    keys = await container.keys.get_jwks()
+    keys = await container.keys.get_jwks(db)
     response.headers["Cache-Control"] = (
         f"public, max-age={max(30, container.settings.jwks_cache_seconds)}"
     )

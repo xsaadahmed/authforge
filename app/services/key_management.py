@@ -16,11 +16,14 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric import rsa
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.core.database import Database
@@ -81,42 +84,52 @@ class KeyManagementService:
         self._lock = asyncio.Lock()
 
     # ------------------------------------------------------------------ read paths
-    async def get_signing_key(self) -> ActiveSigningKey:
+    #
+    # Every read accepts the caller's session. That is not a convenience: opening a *second*
+    # connection while a request already holds a transaction is a pool-exhaustion deadlock waiting
+    # to happen. Under N concurrent refreshes where N equals the pool size, each request holds one
+    # connection and blocks waiting for a second, and nothing can ever commit. Reusing the caller's
+    # session keeps the token path at exactly one connection per request.
+    async def get_signing_key(self, session: AsyncSession | None = None) -> ActiveSigningKey:
         """The key to sign the next token with."""
-        cache = await self._get_cache()
+        cache = await self._get_cache(session)
         if cache.current_kid is None:
             raise ServerError("no active signing key is configured")
         kid = cache.current_kid
         private_key = cache.private_keys.get(kid)
         if private_key is None:
-            private_key = await self._load_private_key(kid)
+            private_key = await self._load_private_key(kid, session)
             cache.private_keys[kid] = private_key
         algorithm = next(
             (key.algorithm for key in cache.published if key.kid == kid), rsa_keys.JWS_ALGORITHM
         )
         return ActiveSigningKey(kid=kid, algorithm=algorithm, private_key=private_key)
 
-    async def get_verification_key(self, kid: str) -> rsa.RSAPublicKey | None:
+    async def get_verification_key(
+        self, kid: str, session: AsyncSession | None = None
+    ) -> rsa.RSAPublicKey | None:
         """Public key for a ``kid``, or None if it is unknown or fully retired.
 
-        A single forced refresh is attempted on a miss: a token signed by a brand-new key can
-        legitimately arrive at a task whose cache predates the rotation.
+        One forced refresh is attempted on a miss: a token signed by a brand-new key can
+        arrive at a task whose cache predates the rotation.
         """
-        cache = await self._get_cache()
+        cache = await self._get_cache(session)
         match = next((key for key in cache.published if key.kid == kid), None)
         if match is None:
-            cache = await self._refresh_cache()
+            cache = await self._refresh_cache(session)
             match = next((key for key in cache.published if key.kid == kid), None)
         if match is None:
             return None
         return rsa_keys.load_public_key(match.public_pem)
 
-    async def get_jwks(self) -> dict[str, list[dict[str, Any]]]:
-        cache = await self._get_cache()
+    async def get_jwks(
+        self, session: AsyncSession | None = None
+    ) -> dict[str, list[dict[str, Any]]]:
+        cache = await self._get_cache(session)
         return {"keys": [key.public_jwk for key in cache.published]}
 
-    async def list_keys(self) -> list[PublishedKey]:
-        cache = await self._get_cache()
+    async def list_keys(self, session: AsyncSession | None = None) -> list[PublishedKey]:
+        cache = await self._get_cache(session)
         return list(cache.published)
 
     def invalidate_cache(self) -> None:
@@ -205,23 +218,31 @@ class KeyManagementService:
         return retired
 
     # ------------------------------------------------------------------ internals
-    async def _get_cache(self) -> _KeyCache:
+    @asynccontextmanager
+    async def _session(self, session: AsyncSession | None) -> AsyncIterator[AsyncSession]:
+        """Use the caller's session when given, otherwise open a short-lived one."""
+        if session is not None:
+            yield session
+            return
+        async with self._database.session() as own_session:
+            yield own_session
+
+    async def _get_cache(self, session: AsyncSession | None = None) -> _KeyCache:
         cache = self._cache
         if cache is not None and cache.expires_at_monotonic > time.monotonic():
             return cache
-        return await self._refresh_cache()
+        return await self._refresh_cache(session)
 
-    async def _refresh_cache(self) -> _KeyCache:
+    async def _refresh_cache(self, session: AsyncSession | None = None) -> _KeyCache:
         async with self._lock:
-            # Re-check under the lock: a thundering herd of concurrent requests on cache
-            # expiry should produce one database read, not one per request.
+            # Re-checked under the lock: a thundering herd of requests arriving on cache expiry
+            # should produce one database read, not one per request.
             cache = self._cache
             if cache is not None and cache.expires_at_monotonic > time.monotonic():
                 return cache
 
-            async with self._database.session() as session:
-                repository = SigningKeyRepository(session)
-                rows = await repository.list_publishable()
+            async with self._session(session) as active:
+                rows = await SigningKeyRepository(active).list_publishable()
                 published = [
                     PublishedKey(
                         kid=row.kid,
@@ -242,16 +263,19 @@ class KeyManagementService:
                 published=published,
                 current_kid=current_kid,
                 expires_at_monotonic=time.monotonic() + self._settings.jwks_cache_seconds,
-                # Drop cached private keys for keys that have left JWKS entirely, so a
-                # retired key's material does not linger in process memory.
+                # Cached private keys for keys that left JWKS entirely are dropped, so a retired
+                # key's material does not linger in process memory.
                 private_keys={k: v for k, v in preserved.items() if k in live_kids},
             )
             return self._cache
 
-    async def _load_private_key(self, kid: str) -> rsa.RSAPrivateKey:
-        async with self._database.session() as session:
-            row = await SigningKeyRepository(session).get_by_kid(kid)
+    async def _load_private_key(
+        self, kid: str, session: AsyncSession | None = None
+    ) -> rsa.RSAPrivateKey:
+        async with self._session(session) as active:
+            row = await SigningKeyRepository(active).get_by_kid(kid)
         if row is None:
             raise ServerError(f"signing key metadata missing for kid {kid}")
         pem = await self._provider.load(row.private_key_ref)
+        # Parsing a 2048-bit PEM is CPU work measured in milliseconds; off the event loop it goes.
         return await asyncio.to_thread(rsa_keys.load_private_key, pem)

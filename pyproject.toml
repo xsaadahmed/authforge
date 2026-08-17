@@ -34,7 +34,6 @@ dev = [
     "pytest-cov>=6.0.0",
     "ruff>=0.8.0",
     "mypy>=1.13.0",
-    "types-redis>=4.6.0",
     "boto3-stubs[secretsmanager]>=1.35.0",
     "asgi-lifespan>=2.1.0",
 ]
@@ -70,12 +69,18 @@ select = [
 ignore = [
     "S104",  # binding to 0.0.0.0 is intentional inside a container
     "B008",  # FastAPI Depends() in defaults is the documented idiom
+    # S105/S106 flag any identifier containing "token", "secret" or "password". In an OAuth server
+    # almost every protocol constant does ("TOKEN_REVOKED", "client_secret_basic", "token_type"), so
+    # the rule yields only false positives here. What it is meant to catch — a real credential in
+    # source — is prevented structurally instead: every secret is a `Settings` field, deployed
+    # environments refuse to boot with development defaults (tests/unit/test_config.py), and the
+    # logging layer redacts by field name (tests/unit/test_logging_redaction.py).
+    "S105",
+    "S106",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "S105", "S106", "S311"]  # asserts and dummy secrets are expected in tests
-"examples/*" = ["S106"]
-"app/services/key_management.py" = ["S105"]   # "current"/"retiring" are status names, not passwords
+"tests/*" = ["S101", "S311"]  # asserts and non-crypto randomness are expected in tests
 
 [tool.ruff.format]
 quote-style = "double"

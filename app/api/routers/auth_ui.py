@@ -28,6 +28,7 @@ from app.repositories.user_repository import UserRepository
 from app.services.authentication import LoginResult
 from app.services.authorization import AuthorizationService
 from app.services.claims import parse_scope_string
+from app.services.consent import IMPLIED_SCOPES
 
 logger = get_logger(__name__)
 
@@ -37,9 +38,6 @@ router = APIRouter(tags=["auth-ui"], include_in_schema=False)
 # password" would turn the login form into an account-enumeration oracle.
 _GENERIC_LOGIN_ERROR = "That email or password is not correct."
 
-# Scopes the consent screen presents as context rather than as an individual choice.
-_IMPLIED_SCOPES = frozenset({"openid"})
-
 
 @router.get("/login", summary="Login form")
 async def login_form(
@@ -47,7 +45,7 @@ async def login_form(
     container: ContainerDep,
     db: DbDep,
     current: CurrentSessionDep,
-    next: str | None = Query(default=None),  # noqa: A002 - OAuth convention names it `next`
+    next: str | None = Query(default=None),
 ) -> Response:
     resume = _sanitize_resume_query(next)
     if current is not None and resume:
@@ -76,7 +74,7 @@ async def login_submit(
     identifier: str = Form(...),
     password: str = Form(...),
     csrf_token: str = Form(...),
-    next: str = Form(default=""),  # noqa: A002
+    next: str = Form(default=""),
 ) -> Response:
     await csrf.validate_flow_token(request, container, csrf_token)
     resume = _sanitize_resume_query(next)
@@ -184,9 +182,7 @@ async def mfa_submit(
 
     if outcome.result is LoginResult.SUCCESS and outcome.session_id:
         # The pending record is already consumed; the resumed request survives on the new session.
-        resume = _sanitize_resume_query(
-            await _resume_from_session(container, outcome.session_id)
-        )
+        resume = _sanitize_resume_query(await _resume_from_session(container, outcome.session_id))
         return _post_authentication_redirect(
             container=container, session_id=outcome.session_id, resume=resume
         )
@@ -246,7 +242,7 @@ async def consent_submit(
 
     if decision != "allow":
         await container.consent.deny(
-            user_id=session_state.user_id, client=client, scopes=requested
+            db, user_id=session_state.user_id, client=client, scopes=requested
         )
         if container.clients.match_redirect_uri(client, redirect_uri) is None:
             # Without a validated redirect target there is nowhere safe to report the denial.
@@ -266,12 +262,16 @@ async def consent_submit(
             status_code=HTTP_303_SEE_OTHER,
         )
 
-    # The grant is the intersection of what the user ticked with what the client may request, so
-    # a forged checkbox value cannot widen it.
+    # The grant is the intersection of what the user ticked with what the client may request, so a
+    # forged or injected checkbox value cannot widen it beyond the client's registration.
     ticked = set(scope)
-    approved = [name for name in requested if name in ticked or name in _IMPLIED_SCOPES]
+    approved = [name for name in requested if name in ticked or name in IMPLIED_SCOPES]
     await container.consent.grant(
-        db, user_id=session_state.user_id, client=client, scopes=approved
+        db,
+        user_id=session_state.user_id,
+        client=client,
+        approved_scopes=approved,
+        requested_scopes=requested,
     )
 
     # `prompt=consent` has now been satisfied; leaving it in would re-prompt forever.
@@ -307,13 +307,14 @@ async def session_overview(
 async def logout(
     request: Request,
     container: ContainerDep,
+    db: DbDep,
     current: CurrentSessionDep,
     csrf_token: str = Form(default=""),
 ) -> Response:
     if current is not None:
         session_id, state = current
         await csrf.validate_session_token(container, session_id=session_id, submitted=csrf_token)
-        await container.authentication.logout(session_id, user_id=state.user_id)
+        await container.authentication.logout(db, session_id, user_id=state.user_id)
     response = render(request, "logged_out.html", {})
     cookies.clear_session_cookie(response, settings=container.settings)
     cookies.clear_flow_cookie(response, settings=container.settings)

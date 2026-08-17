@@ -122,9 +122,7 @@ def build_id_token_claims(
     return claims
 
 
-def build_userinfo_response(
-    *, user: UserClaimSource, granted_scopes: list[str]
-) -> dict[str, Any]:
+def build_userinfo_response(*, user: UserClaimSource, granted_scopes: list[str]) -> dict[str, Any]:
     """OIDC Core §5.3 UserInfo response, filtered to the token's granted scopes."""
     response: dict[str, Any] = {"sub": user.user_id}
     response.update(_identity_claims(user=user, granted_scopes=granted_scopes))

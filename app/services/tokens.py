@@ -26,6 +26,7 @@ from jwt.exceptions import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
+from app.core.database import Database
 from app.core.errors import (
     BearerTokenError,
     InvalidGrantError,
@@ -101,12 +102,14 @@ class TokenService:
         self,
         *,
         settings: Settings,
+        database: Database,
         keys: KeyManagementService,
         auth_codes: AuthCodeStore,
         denylist: TokenDenylistStore,
         audit: AuditService,
     ) -> None:
         self._settings = settings
+        self._database = database
         self._keys = keys
         self._auth_codes = auth_codes
         self._denylist = denylist
@@ -124,35 +127,33 @@ class TokenService:
     ) -> TokenSet:
         payload = await self._auth_codes.redeem(code)
         if payload is None:
-            # Unknown, expired, or already redeemed — indistinguishable by design, and all
-            # three mean the same thing to the client.
-            await self._audit.record(
+            # Unknown, expired, or already redeemed — indistinguishable by design, and all three
+            # mean the same thing to the client. Recorded durably because this request is about to
+            # fail and roll its transaction back.
+            await self._audit.record_durable(
                 AuditEventType.AUTHZ_FAILURE,
-                success=False,
                 client_id=client.client_id,
                 detail={"stage": "code_exchange", "reason": "unknown_or_used_code"},
             )
             raise InvalidGrantError("authorization code is invalid, expired, or already used")
 
         if payload.client_id != client.client_id:
-            # A code issued to a different client. The code is already consumed by the GETDEL
-            # above, so a cross-client probe also burns the code — the legitimate client's
-            # exchange will fail and the user retries, which is the safe direction to fail.
-            await self._audit.record(
+            # A code issued to a different client. The GETDEL above already consumed it, so a
+            # cross-client probe also burns the code: the legitimate client's exchange then fails
+            # and the user retries, which is the safe direction to fail in.
+            await self._audit.record_durable(
                 AuditEventType.AUTHZ_FAILURE,
-                success=False,
                 client_id=client.client_id,
                 detail={"stage": "code_exchange", "reason": "client_mismatch"},
             )
             raise InvalidGrantError("authorization code was not issued to this client")
 
-        # RFC 6749 §4.1.3: redirect_uri is required on exchange when it was in the request, and
-        # must be identical. This is what stops a code obtained via an injected redirect from
-        # being exchanged against the legitimate registration.
+        # RFC 6749 §4.1.3: redirect_uri is required on exchange when it was in the request, and must
+        # be identical. This is what stops a code obtained through an injected redirect from being
+        # exchanged against the legitimate registration.
         if redirect_uri is None or redirect_uri != payload.redirect_uri:
-            await self._audit.record(
+            await self._audit.record_durable(
                 AuditEventType.AUTHZ_FAILURE,
-                success=False,
                 client_id=client.client_id,
                 detail={"stage": "code_exchange", "reason": "redirect_uri_mismatch"},
             )
@@ -163,9 +164,8 @@ class TokenService:
             code_challenge=payload.code_challenge,
             code_challenge_method=payload.code_challenge_method,
         ):
-            await self._audit.record(
+            await self._audit.record_durable(
                 AuditEventType.AUTHZ_FAILURE,
-                success=False,
                 client_id=client.client_id,
                 detail={"stage": "code_exchange", "reason": "pkce_verification_failed"},
             )
@@ -215,9 +215,16 @@ class TokenService:
 
         user = await UserRepository(db).get_by_id(claimed.user_id)
         if user is None or not user.is_active:
-            await repository.revoke_family(
-                claimed.family_id, reason=RevocationReason.ADMIN_ACTION
+            await repository.revoke_family(claimed.family_id, reason=RevocationReason.ADMIN_ACTION)
+            await self._audit.record_in_transaction(
+                db,
+                AuditEventType.TOKEN_REVOKED,
+                success=False,
+                user_id=claimed.user_id,
+                client_id=client.client_id,
+                detail={"reason": "user_inactive", "family_id": claimed.family_id},
             )
+            await self._commit_before_failing(db)
             raise InvalidGrantError("the authorizing user is no longer active")
 
         granted_scopes = list(claimed.scopes)
@@ -269,36 +276,40 @@ class TokenService:
 
         Reached by: an unknown token, a token belonging to another client, an expired token, an
         already-revoked token, a replayed token, and the loser of a legitimate concurrent
-        double-refresh. Only the last two look identical in the database, and both are treated
-        as reuse — a client that races itself is indistinguishable from an attacker replaying a
-        stolen token, and the safe interpretation of an ambiguous signal is the pessimistic one.
+        double-refresh. Only the last two look identical in the database, and both are treated as
+        reuse — a client that races itself is indistinguishable from an attacker replaying a stolen
+        token, and the safe reading of an ambiguous signal is the pessimistic one.
         """
         repository = RefreshTokenRepository(db)
         existing = await repository.get_by_hash(token_hash)
+
         if existing is None:
             await self._audit.record(
+                db,
                 AuditEventType.TOKEN_REVOKED,
                 success=False,
                 client_id=client.client_id,
                 detail={"reason": "unknown_refresh_token"},
             )
-            return
-
-        if existing.client_id != client.id:
+        elif existing.client_id != client.id:
+            # The atomic claim's WHERE clause already refused to spend a token belonging to another
+            # client, so there is nothing to undo here — only something to record.
             await self._audit.record(
+                db,
                 AuditEventType.AUTHZ_FAILURE,
                 success=False,
                 client_id=client.client_id,
-                detail={"reason": "refresh_token_client_mismatch", "family_id": existing.family_id},
+                detail={
+                    "reason": "refresh_token_client_mismatch",
+                    "family_id": existing.family_id,
+                },
             )
-            return
-
-        if existing.used_at is not None:
+        elif existing.used_at is not None:
             revoked_count = await repository.revoke_family(
                 existing.family_id, reason=RevocationReason.REUSE_DETECTED
             )
-            # Same transaction as the revocation: "we killed the family" and "here is why"
-            # must commit together or not at all.
+            # Same transaction as the revocation: "we killed the family" and "here is why" must
+            # commit together or not at all.
             await self._audit.record_in_transaction(
                 db,
                 AuditEventType.REFRESH_REUSE_DETECTED,
@@ -322,16 +333,38 @@ class TokenService:
                     "tokens_revoked": revoked_count,
                 },
             )
-            return
+        else:
+            reason = "revoked" if existing.revoked else "expired"
+            await self._audit.record(
+                db,
+                AuditEventType.TOKEN_REVOKED,
+                success=False,
+                user_id=existing.user_id,
+                client_id=client.client_id,
+                detail={"reason": f"refresh_token_{reason}", "family_id": existing.family_id},
+            )
 
-        reason = "revoked" if existing.revoked else "expired"
-        await self._audit.record(
-            AuditEventType.TOKEN_REVOKED,
-            success=False,
-            user_id=existing.user_id,
-            client_id=client.client_id,
-            detail={"reason": f"refresh_token_{reason}", "family_id": existing.family_id},
-        )
+        await self._commit_before_failing(db)
+
+    @staticmethod
+    async def _commit_before_failing(db: AsyncSession) -> None:
+        """Commit the request's transaction even though the request is about to fail.
+
+        Two problems make this the right shape rather than an awkward one.
+
+        First, correctness: the caller raises ``invalid_grant`` immediately after, and the request's
+        unit of work rolls back on any exception. A family revocation written there would be undone,
+        leaving the IdP having told a client the family was dead while it still worked.
+
+        Second, and less obviously, the alternative does not work. Opening a *second* transaction to
+        write the revocation self-deadlocks: this transaction's ``UPDATE ... WHERE used_at IS NULL``
+        already waited on, and may still hold locks against, the rows the revocation must touch,
+        so the new transaction would block on the old one — with no third party to break the tie, it
+        waits until ``statement_timeout`` fires. Committing here releases those locks and closes the
+        write in one transaction. The subsequent rollback then applies to a fresh, empty transaction
+        and is a no-op.
+        """
+        await db.commit()
 
     # ------------------------------------------------------------------ issuance
     async def _issue_token_set(
@@ -353,7 +386,7 @@ class TokenService:
     ) -> TokenSet:
         now = int(time.time())
         access_ttl = client.access_token_ttl_seconds or self._settings.access_token_ttl_seconds
-        signing_key = await self._keys.get_signing_key()
+        signing_key = await self._keys.get_signing_key(db)
 
         access_claims = claims_lib.build_access_token_claims(
             issuer=self._settings.issuer,
@@ -369,7 +402,7 @@ class TokenService:
         )
         access_token = jwt.encode(
             access_claims,
-            signing_key.private_key,  # type: ignore[arg-type]
+            signing_key.private_key,
             algorithm=signing_key.algorithm,
             headers={"kid": signing_key.kid, "typ": claims_lib.ACCESS_TOKEN_TYPE_HEADER},
         )
@@ -392,7 +425,7 @@ class TokenService:
             )
             id_token = jwt.encode(
                 id_claims,
-                signing_key.private_key,  # type: ignore[arg-type]
+                signing_key.private_key,
                 algorithm=signing_key.algorithm,
                 headers={"kid": signing_key.kid, "typ": claims_lib.ID_TOKEN_TYPE_HEADER},
             )
@@ -429,7 +462,9 @@ class TokenService:
         return [self._settings.issuer, *self._settings.access_token_audiences]
 
     # ------------------------------------------------------------------ verification
-    async def verify_access_token(self, token: str) -> VerifiedAccessToken:
+    async def verify_access_token(
+        self, token: str, *, session: AsyncSession | None = None
+    ) -> VerifiedAccessToken:
         """Validate a bearer access token for a protected resource (§8E).
 
         Order is deliberate: parse the header to find ``kid``, resolve the key, then let PyJWT
@@ -449,14 +484,14 @@ class TokenService:
         if header.get("typ") not in (claims_lib.ACCESS_TOKEN_TYPE_HEADER, "JWT"):
             raise BearerTokenError(description="token is not an access token")
 
-        public_key = await self._keys.get_verification_key(str(kid))
+        public_key = await self._keys.get_verification_key(str(kid), session)
         if public_key is None:
             raise BearerTokenError(description="token was signed by an unknown or retired key")
 
         try:
             payload = jwt.decode(
                 token,
-                public_key,  # type: ignore[arg-type]
+                public_key,
                 algorithms=["RS256"],
                 issuer=self._settings.issuer,
                 audience=self._access_token_audiences(),
@@ -506,7 +541,9 @@ class TokenService:
                 db, client=client, token=token
             ):
                 return
-            if kind == "access_token" and await self._revoke_access_token(client=client, token=token):
+            if kind == "access_token" and await self._revoke_access_token(
+                db, client=client, token=token
+            ):
                 return
 
     async def _revoke_refresh_token(
@@ -534,9 +571,11 @@ class TokenService:
         )
         return True
 
-    async def _revoke_access_token(self, *, client: OAuthClient, token: str) -> bool:
+    async def _revoke_access_token(
+        self, db: AsyncSession, *, client: OAuthClient, token: str
+    ) -> bool:
         try:
-            verified = await self.verify_access_token(token)
+            verified = await self.verify_access_token(token, session=db)
         except BearerTokenError:
             return False
         if verified.client_id != client.client_id:
@@ -544,6 +583,7 @@ class TokenService:
         remaining = verified.expires_at - int(time.time())
         await self._denylist.revoke(jti=verified.jti, ttl_seconds=remaining)
         await self._audit.record(
+            db,
             AuditEventType.TOKEN_REVOKED,
             user_id=verified.subject,
             client_id=client.client_id,

@@ -23,6 +23,7 @@ from redis.asyncio.client import Redis
 
 from app.core.logging import get_logger
 from app.security.random_tokens import hash_token, new_opaque_token
+from app.stores.serialization import as_text
 
 logger = get_logger(__name__)
 
@@ -79,7 +80,7 @@ class AuthCodeStore:
         if raw is None:
             return None
         try:
-            return AuthorizationCodePayload.from_json(raw)
+            return AuthorizationCodePayload.from_json(as_text(raw))
         except (json.JSONDecodeError, TypeError, ValueError):
             # A payload we cannot parse is already deleted, so the code is spent either way.
             logger.error("authorization code payload could not be decoded")
