@@ -161,3 +161,35 @@ module "ecs" {
     module.security_groups,
   ]
 }
+
+module "observability" {
+  source = "../../modules/observability"
+
+  environment            = var.environment
+  project                = var.project
+  aws_region             = var.aws_region
+  alb_arn_suffix         = module.alb.alb_arn_suffix
+  ecs_cluster_name       = module.ecs.cluster_name
+  ecs_service_name       = module.ecs.service_name
+  ecs_log_group_name     = module.ecs.log_group_name
+  ecs_desired_task_count = 2
+
+  depends_on = [module.alb, module.ecs]
+}
+
+module "github_oidc" {
+  source = "../../modules/github_oidc"
+
+  environment        = var.environment
+  project            = var.project
+  aws_region         = var.aws_region
+  github_repository  = var.github_repository
+  state_bucket_name  = var.terraform_state_bucket_name
+  state_key_prefix   = "staging/"
+  lock_table_name    = var.terraform_lock_table_name
+  ecr_repository_arn = module.ecr.repository_arn
+  ecs_cluster_name   = module.ecs.cluster_name
+  ecs_service_name   = module.ecs.service_name
+
+  depends_on = [module.ecr, module.ecs]
+}

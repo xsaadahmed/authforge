@@ -1,48 +1,3 @@
-output "rds_endpoint" {
-  description = "RDS connection endpoint."
-  value       = module.rds.endpoint
-}
-
-output "rds_master_user_secret_arn" {
-  description = "ARN of the RDS-managed master password secret."
-  value       = module.rds.master_user_secret_arn
-}
-
-output "redis_endpoint" {
-  description = "Primary Redis hostname."
-  value       = module.redis.address
-}
-
-output "redis_port" {
-  description = "Redis port."
-  value       = module.redis.port
-}
-
-output "ecr_repository_url" {
-  description = "ECR repository URL for container images."
-  value       = module.ecr.repository_url
-}
-
-output "totp_encryption_key_secret_arn" {
-  description = "ARN of the TOTP encryption key secret."
-  value       = module.secrets.totp_encryption_key_secret_arn
-}
-
-output "admin_api_token_secret_arn" {
-  description = "ARN of the admin API token secret."
-  value       = module.secrets.admin_api_token_secret_arn
-}
-
-output "redis_auth_token_secret_arn" {
-  description = "ARN of the Redis AUTH token secret."
-  value       = module.secrets.redis_auth_token_secret_arn
-}
-
-output "app_secret_name_prefix" {
-  description = "Secrets Manager prefix for Terraform-managed app secrets."
-  value       = module.secrets.secret_name_prefix
-}
-
 output "alb_dns_name" {
   description = "DNS name of the staging Application Load Balancer."
   value       = module.alb.alb_dns_name
@@ -66,6 +21,66 @@ output "ecs_cluster_name" {
 output "ecs_service_name" {
   description = "ECS service name."
   value       = module.ecs.service_name
+}
+
+output "ecr_repository_url" {
+  description = "ECR repository URL for container images."
+  value       = module.ecr.repository_url
+}
+
+output "github_plan_role_arn" {
+  description = "GitHub Actions OIDC role ARN for Terraform plan (PRs)."
+  value       = module.github_oidc.plan_role_arn
+}
+
+output "github_apply_role_arn" {
+  description = "GitHub Actions OIDC role ARN for apply/deploy (main branch)."
+  value       = module.github_oidc.apply_role_arn
+}
+
+output "sns_alerts_topic_arn" {
+  description = "SNS topic ARN for CloudWatch alarms (subscribe manually)."
+  value       = module.observability.sns_topic_arn
+}
+
+output "rds_endpoint" {
+  description = "RDS connection endpoint."
+  value       = module.rds.endpoint
+}
+
+output "rds_master_user_secret_arn" {
+  description = "ARN of the RDS-managed master password secret."
+  value       = module.rds.master_user_secret_arn
+}
+
+output "redis_endpoint" {
+  description = "Primary Redis hostname."
+  value       = module.redis.address
+}
+
+output "redis_port" {
+  description = "Redis port."
+  value       = module.redis.port
+}
+
+output "totp_encryption_key_secret_arn" {
+  description = "ARN of the TOTP encryption key secret."
+  value       = module.secrets.totp_encryption_key_secret_arn
+}
+
+output "admin_api_token_secret_arn" {
+  description = "ARN of the admin API token secret."
+  value       = module.secrets.admin_api_token_secret_arn
+}
+
+output "redis_auth_token_secret_arn" {
+  description = "ARN of the Redis AUTH token secret."
+  value       = module.secrets.redis_auth_token_secret_arn
+}
+
+output "app_secret_name_prefix" {
+  description = "Secrets Manager prefix for Terraform-managed app secrets."
+  value       = module.secrets.secret_name_prefix
 }
 
 output "database_url_secret_arn" {

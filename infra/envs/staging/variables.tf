@@ -42,3 +42,21 @@ variable "image_tag" {
   type        = string
   default     = "latest"
 }
+
+variable "github_repository" {
+  description = "GitHub repository slug (org/name) for OIDC trust policies."
+  type        = string
+  default     = "xsaadahmed/authforge"
+}
+
+variable "terraform_state_bucket_name" {
+  description = "Terraform remote state bucket name (from bootstrap)."
+  type        = string
+  default     = "authforge-terraform-state"
+}
+
+variable "terraform_lock_table_name" {
+  description = "Terraform state lock DynamoDB table name (from bootstrap)."
+  type        = string
+  default     = "authforge-terraform-locks"
+}

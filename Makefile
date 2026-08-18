@@ -148,8 +148,20 @@ tf-fmt: ## Format the Terraform sources
 tf-validate: ## Validate every Terraform module and environment
 	./scripts/validate-terraform.sh
 
-.PHONY: loadtest
-loadtest: ## Run the k6 load test against a deployed environment
-	@test -n "$$AUTHFORGE_LOADTEST_ISSUER" \
-		|| { echo "set AUTHFORGE_LOADTEST_ISSUER to the target environment's issuer URL"; exit 1; }
-	k6 run loadtest/token_endpoint.js
+.PHONY: loadtest-token
+loadtest-token: ## k6 authorization_code + PKCE token exchange against BASE_URL
+	@test -n "$$BASE_URL" || { echo "set BASE_URL to the staging ALB URL"; exit 1; }
+	@test -n "$$CLIENT_ID" || { echo "set CLIENT_ID"; exit 1; }
+	@test -n "$$CLIENT_SECRET" || { echo "set CLIENT_SECRET"; exit 1; }
+	@test -n "$$USER_EMAIL" || { echo "set USER_EMAIL"; exit 1; }
+	@test -n "$$USER_PASSWORD" || { echo "set USER_PASSWORD"; exit 1; }
+	k6 run loadtest/k6/token_exchange.js
+
+.PHONY: loadtest-refresh
+loadtest-refresh: ## k6 concurrent refresh_token grants (rotation / reuse detection)
+	@test -n "$$BASE_URL" || { echo "set BASE_URL to the staging ALB URL"; exit 1; }
+	@test -n "$$CLIENT_ID" || { echo "set CLIENT_ID"; exit 1; }
+	@test -n "$$CLIENT_SECRET" || { echo "set CLIENT_SECRET"; exit 1; }
+	@test -n "$$USER_EMAIL" || { echo "set USER_EMAIL"; exit 1; }
+	@test -n "$$USER_PASSWORD" || { echo "set USER_PASSWORD"; exit 1; }
+	k6 run loadtest/k6/refresh_rotation.js
