@@ -21,7 +21,6 @@ dev-keys/
 *.tfstate.*
 *.tfplan
 crash.log
-.terraform.lock.hcl
 
 .idea/
 .vscode/
