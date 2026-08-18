@@ -15,10 +15,8 @@ data "aws_iam_policy_document" "ecs_task_execution_assume" {
   }
 }
 
-# Shell role for the ECS task execution role. Policy attachments for
-# ecr:GetAuthorizationToken, logs:CreateLogStream/PutLogEvents, and
-# secretsmanager:GetSecretValue (scoped to an authforge/* prefix) will be
-# added once ECR, CloudWatch Logs, and Secrets Manager resources exist.
+# Task execution and task role inline policies are attached by the ECS module once ECR,
+# CloudWatch Logs, and Secrets Manager resources exist.
 resource "aws_iam_role" "ecs_task_execution" {
   name               = "${local.name_prefix}-ecs-task-execution"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_execution_assume.json

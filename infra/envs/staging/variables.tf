@@ -24,3 +24,21 @@ variable "availability_zones" {
   type        = list(string)
   default     = []
 }
+
+variable "enable_https" {
+  description = "Enable HTTPS on the ALB with ACM certificate termination."
+  type        = bool
+  default     = false
+}
+
+variable "certificate_arn" {
+  description = "ACM certificate ARN when enable_https is true."
+  type        = string
+  default     = null
+}
+
+variable "image_tag" {
+  description = "ECR image tag deployed to ECS."
+  type        = string
+  default     = "latest"
+}
