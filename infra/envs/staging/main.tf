@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 
   # Values must match infra/bootstrap outputs after bootstrap has been applied manually.
@@ -52,4 +56,44 @@ module "iam" {
 
   environment = var.environment
   project     = var.project
+}
+
+module "secrets" {
+  source = "../../modules/secrets"
+
+  environment = var.environment
+  project     = var.project
+}
+
+module "ecr" {
+  source = "../../modules/ecr"
+
+  environment = var.environment
+  project     = var.project
+}
+
+module "rds" {
+  source = "../../modules/rds"
+
+  environment         = var.environment
+  project             = var.project
+  subnet_ids          = module.vpc.private_subnet_ids
+  security_group_ids  = [module.security_groups.rds_security_group_id]
+  skip_final_snapshot = true
+  deletion_protection = false
+  multi_az            = false
+
+  depends_on = [module.security_groups]
+}
+
+module "redis" {
+  source = "../../modules/redis"
+
+  environment        = var.environment
+  project            = var.project
+  subnet_ids         = module.vpc.private_subnet_ids
+  security_group_ids = [module.security_groups.redis_security_group_id]
+  auth_token         = module.secrets.redis_auth_token
+
+  depends_on = [module.secrets, module.security_groups]
 }
