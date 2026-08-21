@@ -1,8 +1,9 @@
 """Database constraint and Redis behaviour tests (§23).
 
-These assert the guarantees the design *delegates* to Postgres and Redis rather than implements in
-Python. A unique constraint, a partial index, a TTL and the atomicity of ``GETDEL`` are all load-bearing
-here, and each is only real if the engine actually provides it.
+These assert the guarantees the design *delegates* to Postgres and Redis rather than
+implements in Python. A unique constraint, a partial index, a TTL and the atomicity of
+``GETDEL`` are all load-bearing here, and each is only real if the engine actually provides
+it.
 """
 
 from __future__ import annotations
@@ -165,9 +166,11 @@ async def test_deleting_a_user_cascades_to_their_tokens_and_consents(
 async def test_the_partial_index_on_active_refresh_tokens_has_the_intended_predicate(
     container: Container,
 ) -> None:
-    """The hot path is "find this hash if it is still redeemable", so the index covers only live rows.
+    """The hot path is "find this hash if it is still redeemable", so the index covers only
+    live rows.
 
-    Spent generations accumulate for forensics without inflating the index the refresh endpoint uses.
+    Spent generations accumulate for forensics without inflating the index the refresh
+    endpoint uses.
     """
     async with container.database.session() as session:
         definition = (
@@ -187,11 +190,13 @@ async def test_the_partial_index_on_active_refresh_tokens_has_the_intended_predi
 async def test_the_partial_index_is_usable_for_the_refresh_lookup(
     container: Container, seeded: Seeded
 ) -> None:
-    """Asserted by disabling sequential scans rather than by inserting enough rows to sway the planner.
+    """Asserted by disabling sequential scans rather than by inserting enough rows to sway
+    the planner.
 
-    On a small table Postgres will correctly prefer a sequential scan whatever indexes exist, so a
-    plain EXPLAIN would test the row count rather than the index. Forcing the planner's hand proves the
-    index actually *covers* this predicate — which is what a future schema change could silently break.
+    On a small table Postgres will correctly prefer a sequential scan whatever indexes exist,
+    so a plain EXPLAIN would test the row count rather than the index. Forcing the planner's
+    hand proves the index actually *covers* this predicate — which is what a future schema
+    change could silently break.
     """
     async with container.database.session() as session:
         for index in range(20):
@@ -362,8 +367,8 @@ async def test_the_raw_session_id_never_appears_in_redis(container: Container) -
 
 
 async def test_session_replacement_preserves_the_remaining_ttl(container: Container) -> None:
-    """Refreshing the expiry on every request would silently turn a bounded session into an indefinite
-    one."""
+    """Refreshing the expiry on every request would silently turn a bounded session into an
+    indefinite one."""
     from app.stores.session_store import SessionState
 
     session_id = await container.sessions.create(
@@ -396,8 +401,8 @@ async def test_session_rotation_destroys_the_previous_identifier(container: Cont
 async def test_a_totp_code_can_be_claimed_only_once_even_under_concurrency(
     container: Container,
 ) -> None:
-    """``SET NX``, so an attacker replaying an observed code against several tasks at once still only
-    gets one acceptance."""
+    """``SET NX``, so an attacker replaying an observed code against several tasks at once
+    still only gets one acceptance."""
     key = "totp_used:01USER:abc"
     results = await asyncio.gather(
         *[container.sessions.mark_totp_code_used(key, ttl_seconds=90) for _ in range(20)]

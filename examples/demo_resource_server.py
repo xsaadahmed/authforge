@@ -1,11 +1,12 @@
 """A minimal resource server protected by AuthForge access tokens.
 
-Shares no code with the IdP and never calls it on the request path: it fetches JWKS once, caches it,
-and verifies tokens locally. That is the whole point of issuing signed JWTs — a resource server scales
-without a round trip to the authorization server for every request.
+Shares no code with the IdP and never calls it on the request path: it fetches JWKS once,
+caches it, and verifies tokens locally. That is the whole point of issuing signed JWTs — a
+resource server scales without a round trip to the authorization server for every request.
 
-The five checks in ``_verify`` are the complete set a resource server owes its users. Skipping any one
-of them is a real vulnerability, and the audience check is the one most often forgotten.
+The five checks in ``_verify`` are the complete set a resource server owes its users.
+Skipping any one of them is a real vulnerability, and the audience check is the one most
+often forgotten.
 """
 
 from __future__ import annotations
@@ -25,8 +26,8 @@ IDP_ISSUER = os.environ.get("AUTHFORGE_DEMO_ISSUER", "http://localhost:8000")
 API_AUDIENCE = os.environ.get("AUTHFORGE_DEMO_API_AUDIENCE", IDP_ISSUER)
 REQUIRED_SCOPE = os.environ.get("AUTHFORGE_DEMO_REQUIRED_SCOPE", "profile")
 # JWKS is cached, but not forever: the cache TTL is what lets a key rotation propagate without a
-# restart. Too long and a token signed by a new key is rejected; too short and every request pays for
-# an HTTP round trip.
+# restart. Too long and a token signed by a new key is rejected; too short and every request
+# pays for an HTTP round trip.
 JWKS_CACHE_SECONDS = 300
 
 app = FastAPI(title="AuthForge Demo Resource Server", docs_url=None, redoc_url=None)
@@ -59,8 +60,8 @@ async def _verify(authorization: str | None) -> dict[str, Any]:
     kid = jwt.get_unverified_header(token).get("kid")
     signing_key = next((key for key in key_set.keys if key.key_id == kid), None)
     if signing_key is None:
-        # Either a forged token or one signed by a key rotated in since the cache was filled. Refetch
-        # once before rejecting, so a rotation does not cause a burst of spurious 401s.
+        # Either a forged token or one signed by a key rotated in since the cache was filled.
+        # Refetch once before rejecting, so a rotation does not cause a burst of spurious 401s.
         global _jwks_cache
         _jwks_cache = None
         key_set = await _get_jwks()

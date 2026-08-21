@@ -4,7 +4,6 @@
 import json
 import shutil
 import subprocess
-import sys
 
 
 def main() -> None:
@@ -14,7 +13,8 @@ def main() -> None:
 
     try:
         result = subprocess.run(
-            ["aws", "iam", "list-open-id-connect-providers", "--output", "json"],
+            # aws is resolved via PATH after shutil.which confirms it is installed.
+            ["aws", "iam", "list-open-id-connect-providers", "--output", "json"],  # noqa: S607
             capture_output=True,
             text=True,
             check=True,

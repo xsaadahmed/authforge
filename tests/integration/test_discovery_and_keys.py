@@ -129,12 +129,13 @@ async def test_rotation_creates_a_new_current_key_and_retires_the_previous_one(
 async def test_both_current_and_retiring_keys_stay_in_jwks(
     app_client: AsyncClient, container: Container
 ) -> None:
-    """The grace period is what makes rotation non-disruptive: a token signed a millisecond before the
-    rotation must still verify for its entire lifetime."""
+    """The grace period is what makes rotation non-disruptive: a token signed a millisecond
+    before the rotation must still verify for its entire lifetime."""
     original = (await app_client.get("/.well-known/jwks.json")).json()["keys"][0]["kid"]
     new_kid = await container.keys.rotate(reason="test")
 
-    published = {key["kid"] for key in (await app_client.get("/.well-known/jwks.json")).json()["keys"]}
+    jwks = (await app_client.get("/.well-known/jwks.json")).json()["keys"]
+    published = {key["kid"] for key in jwks}
     assert published == {original, new_kid}
 
 
@@ -178,8 +179,8 @@ async def test_new_tokens_are_signed_by_the_new_key_after_rotation(
 async def test_a_swept_retired_key_leaves_jwks(
     app_client: AsyncClient, container: Container
 ) -> None:
-    """After the grace period a key must disappear, or JWKS grows without bound and a compromised old
-    key would keep verifying forever."""
+    """After the grace period a key must disappear, or JWKS grows without bound and a
+    compromised old key would keep verifying forever."""
     from datetime import UTC, datetime, timedelta
 
     from app.repositories.signing_key_repository import SigningKeyRepository
@@ -195,7 +196,8 @@ async def test_a_swept_retired_key_leaves_jwks(
     retired = await container.keys.sweep_retired_keys(destroy_private_material=False)
     assert original in retired
 
-    published = {key["kid"] for key in (await app_client.get("/.well-known/jwks.json")).json()["keys"]}
+    jwks = (await app_client.get("/.well-known/jwks.json")).json()["keys"]
+    published = {key["kid"] for key in jwks}
     assert original not in published
 
 

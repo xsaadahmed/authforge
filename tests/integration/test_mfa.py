@@ -58,7 +58,8 @@ async def test_enrolment_requires_authentication(app_client: AsyncClient) -> Non
 async def test_an_unconfirmed_secret_does_not_count_as_enrolled(
     app_client: AsyncClient, seeded: Seeded, container: Container
 ) -> None:
-    """Otherwise a user who abandoned enrolment would be locked out by a factor they never set up."""
+    """Otherwise a user who abandoned enrolment would be locked out by a factor they never set
+    up."""
     await login(app_client, seeded)
     await app_client.post("/account/mfa/enroll")
 
@@ -162,8 +163,8 @@ async def test_a_totp_code_cannot_be_replayed(
 ) -> None:
     """A valid code stays valid for ~90 seconds given the skew window, so single use matters.
 
-    Without this, a code observed once — shoulder-surfed, phished, or captured by a proxy — is usable
-    again inside that window.
+    Without this, a code observed once — shoulder-surfed, phished, or captured by a proxy — is
+    usable again inside that window.
     """
     secret, _ = await _enrol(app_client, seeded)
     code = totp_lib.current_code(secret)
@@ -248,7 +249,8 @@ async def test_recovery_codes_tolerate_user_formatting(
 async def test_regenerating_recovery_codes_invalidates_the_old_set(
     app_client: AsyncClient, seeded: Seeded
 ) -> None:
-    """Codes are replaced, never added to, so a user who suspects an old printout leaked can end it."""
+    """Codes are replaced, never added to, so a user who suspects an old printout leaked can
+    end it."""
     _, original = await _enrol(app_client, seeded)
     response = await app_client.post("/account/mfa/recovery-codes")
     assert response.status_code == 200

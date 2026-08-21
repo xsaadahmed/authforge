@@ -165,10 +165,10 @@ async def mfa_submit(
             db, pending_mfa_id=pending_id, code=code, use_recovery_code=recovery
         )
     except RateLimitedError as exc:
-        # The pending state was destroyed, so there is nothing left to retry against: the user is sent
-        # back to the password step rather than to a form that can no longer succeed. Rendered with a
-        # real 429 and Retry-After so the status is meaningful to a proxy or a monitor, while the body
-        # stays readable to the person who hit the limit.
+        # The pending state was destroyed, so there is nothing left to retry against: the user
+        # is sent back to the password step rather than to a form that can no longer succeed.
+        # Rendered with a real 429 and Retry-After so the status is meaningful to a proxy or a
+        # monitor, while the body stays readable to the person who hit the limit.
         flow = await csrf.issue_token_for_flow(request, container)
         response = render(
             request,
