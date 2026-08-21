@@ -46,9 +46,7 @@ async def test_rate_limiting_fails_open_when_redis_is_unreachable(
     Redis: Argon2id makes each guess expensive, and the failure counter and lockout are durable
     rows in Postgres.
     """
-    service = RateLimitService(
-        settings=container.settings, store=RateLimitStore(_broken_redis())
-    )
+    service = RateLimitService(settings=container.settings, store=RateLimitStore(_broken_redis()))
     verdict = await service.check_login_attempt(ip_address="203.0.113.5", subject="user@x.test")
     assert verdict.allowed is True
     # Flagged, so a degraded decision is never mistaken for a real pass in the logs or metrics.

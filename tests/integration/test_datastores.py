@@ -119,9 +119,7 @@ async def test_a_client_cannot_register_the_same_redirect_uri_twice(
 
     with pytest.raises(IntegrityError):
         async with container.database.session() as session:
-            session.add(
-                ClientRedirectUri(client_id=seeded.client_internal_id, uri=existing)
-            )
+            session.add(ClientRedirectUri(client_id=seeded.client_internal_id, uri=existing))
             await session.flush()
 
 
@@ -374,9 +372,7 @@ async def test_session_replacement_preserves_the_remaining_ttl(container: Contai
     session_id = await container.sessions.create(
         SessionState(user_id="01USER", auth_time=0, mfa_verified=False, created_at=0)
     )
-    await container.redis.client.expire(
-        f"session:{hash_token(session_id)}", 120
-    )
+    await container.redis.client.expire(f"session:{hash_token(session_id)}", 120)
     state = await container.sessions.get(session_id)
     assert state is not None
     state.mfa_verified = True
@@ -434,10 +430,7 @@ async def test_the_sliding_window_is_atomic_under_concurrency(container: Contain
 
     store = RateLimitStore(container.redis.client)
     verdicts = await asyncio.gather(
-        *[
-            store.consume(key="test:concurrent", limit=5, window_seconds=60)
-            for _ in range(40)
-        ]
+        *[store.consume(key="test:concurrent", limit=5, window_seconds=60) for _ in range(40)]
     )
     assert sum(1 for verdict in verdicts if verdict.allowed) == 5
 

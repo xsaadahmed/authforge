@@ -64,9 +64,7 @@ async def test_an_unconfirmed_secret_does_not_count_as_enrolled(
     await app_client.post("/account/mfa/enroll")
 
     async with container.database.session() as session:
-        credential = (
-            (await session.execute(select(MfaCredential))).scalars().one()
-        )
+        credential = (await session.execute(select(MfaCredential))).scalars().one()
     assert credential.confirmed_at is None
 
     app_client.cookies.clear()
@@ -158,9 +156,7 @@ async def test_a_wrong_totp_code_does_not_produce_a_session(
     assert app_client.cookies.get("authforge_session") is None
 
 
-async def test_a_totp_code_cannot_be_replayed(
-    app_client: AsyncClient, seeded: Seeded
-) -> None:
+async def test_a_totp_code_cannot_be_replayed(app_client: AsyncClient, seeded: Seeded) -> None:
     """A valid code stays valid for ~90 seconds given the skew window, so single use matters.
 
     Without this, a code observed once — shoulder-surfed, phished, or captured by a proxy — is
