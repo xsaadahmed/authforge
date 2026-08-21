@@ -469,6 +469,29 @@ Metrics to capture once the system exists (do not pre-invent numbers): sustained
 
 **Deploy flow:** GitHub Actions builds an image tagged with the git SHA → pushes to ECR → `terraform apply`/`aws ecs update-service` references the new tag → ECS performs a rolling deployment with the deployment circuit breaker enabled (auto-rollback on failed health checks) → a post-deploy smoke test hits `/health` and `/.well-known/openid-configuration` before the pipeline is considered successful.
 
+### Staging bootstrap checklist (manual / first bring-up)
+
+RDS and Redis stay private (reachable only from `ecs-sg`). Do **not** open them to the internet and do **not** rely on a bastion — run admin work as one-off Fargate tasks on the same task definition, private subnets, and security group as the service (`scripts/run-ecs-oneoff.sh`, wrapped by the Make targets below).
+
+1. **Apply staging infra** (once): `terraform -chdir=infra/envs/staging apply`
+2. **Build and push an image** to ECR (immutable tags; prefer the git SHA, or a one-off tag like `v1` for a manual first push).
+3. **Point ECS at that image** and roll the service:
+   ```bash
+   terraform -chdir=infra/envs/staging apply -var='image_tag=v1'
+   ```
+   (`image_tag` defaults to `latest` in `infra/envs/staging/variables.tf` if unset in `terraform.tfvars`.)
+4. **Confirm tasks are healthy** — CloudWatch log group `/ecs/authforge-staging`; ALB target-group health `healthy`; `aws ecs describe-tasks` shows `lastStatus=RUNNING` / `desiredStatus=RUNNING` (not a tight stop/start loop with a non-zero `containers[].exitCode`).
+5. **Migrate schema, then create the first signing key** (order matters — the `signing_keys` table must exist first):
+   ```bash
+   make migrate-staging
+   make bootstrap-keys-staging
+   ```
+   On a brand-new environment run **`authforge-admin keys init`** (what `make bootstrap-keys-staging` calls). Prefer `keys init` / `keys bootstrap` over `keys rotate` for the first key: `rotate` works with zero keys, but a second rotate would demote the first key to `retiring`.
+
+One-off tasks reuse the service task definition with a `command` override via `aws ecs run-task`; cluster / task definition / subnets / security group / log group come from `terraform output`, not hardcoded values.
+
+After the first bring-up, day-to-day staging deploys go through GitHub Actions on `main` (build → push → terraform apply → smoke), not manual `docker push` / `terraform apply` unless you are recovering from a failed run.
+
 ---
 
 ## 27. Recommended Repository Structure

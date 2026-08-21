@@ -23,6 +23,26 @@ output "task_definition_arn" {
   value       = aws_ecs_task_definition.this.arn
 }
 
+output "task_definition_family" {
+  description = "ECS task definition family name."
+  value       = aws_ecs_task_definition.this.family
+}
+
+output "container_name" {
+  description = "Primary container name in the task definition (used by run-task overrides)."
+  value       = local.container_name
+}
+
+output "private_subnet_ids" {
+  description = "Private subnet IDs used by the ECS service (and one-off tasks)."
+  value       = var.private_subnet_ids
+}
+
+output "ecs_security_group_id" {
+  description = "Security group ID attached to ECS tasks."
+  value       = var.ecs_security_group_id
+}
+
 output "log_group_name" {
   description = "CloudWatch log group for ECS tasks."
   value       = aws_cloudwatch_log_group.this.name

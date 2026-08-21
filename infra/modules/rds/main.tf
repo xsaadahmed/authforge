@@ -40,6 +40,10 @@ resource "aws_db_instance" "this" {
   skip_final_snapshot     = var.skip_final_snapshot
   deletion_protection     = var.deletion_protection
 
+  lifecycle {
+    ignore_changes = [engine_version]
+  }
+
   tags = {
     Name = "${local.name_prefix}-postgres"
   }

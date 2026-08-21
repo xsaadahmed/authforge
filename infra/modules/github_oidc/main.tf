@@ -1,30 +1,14 @@
-terraform {
-  required_providers {
-    external = {
-      source  = "hashicorp/external"
-      version = "~> 2.3"
-    }
-  }
-}
-
 data "aws_caller_identity" "current" {}
 
 data "aws_partition" "current" {}
-
-data "external" "github_oidc" {
-  program = ["bash", "${path.module}/find_oidc_provider.sh"]
-}
 
 locals {
   name_prefix = "${var.project}-${var.environment}"
 
   github_oidc_url = "https://token.actions.githubusercontent.com"
 
-  existing_github_oidc_arn = trimspace(data.external.github_oidc.result.arn)
-
-  create_github_oidc_provider = local.existing_github_oidc_arn == ""
-
-  github_oidc_provider_arn = local.create_github_oidc_provider ? aws_iam_openid_connect_provider.github[0].arn : local.existing_github_oidc_arn
+  # OIDC provider ARNs use a fixed suffix; no need to read the created resource ARN.
+  github_oidc_provider_arn = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
 
   state_bucket_arn        = "arn:${data.aws_partition.current.partition}:s3:::${var.state_bucket_name}"
   state_object_arn_prefix = "${local.state_bucket_arn}/${var.state_key_prefix}*"
@@ -44,7 +28,7 @@ locals {
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
-  count = local.create_github_oidc_provider ? 1 : 0
+  count = var.create_github_oidc_provider ? 1 : 0
 
   url = local.github_oidc_url
 

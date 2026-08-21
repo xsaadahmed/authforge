@@ -1,9 +1,23 @@
 locals {
   name_prefix = "${var.project}-${var.environment}"
+  # ALB and target group name_prefix must be <= 6 characters.
+  alb_name_prefix = substr(
+    replace(
+      replace(
+        replace(local.name_prefix, "authforge", "af"),
+        "staging",
+        "stg"
+      ),
+      "prod",
+      "prd"
+    ),
+    0,
+    6
+  )
 }
 
 resource "aws_lb" "this" {
-  name_prefix        = substr("${local.name_prefix}-", 0, 32)
+  name_prefix        = local.alb_name_prefix
   internal           = false
   load_balancer_type = "application"
   security_groups    = var.security_group_ids
@@ -20,7 +34,7 @@ resource "aws_lb" "this" {
 }
 
 resource "aws_lb_target_group" "this" {
-  name_prefix = substr("${local.name_prefix}-", 0, 32)
+  name_prefix = local.alb_name_prefix
   port        = var.target_port
   protocol    = "HTTP"
   vpc_id      = var.vpc_id

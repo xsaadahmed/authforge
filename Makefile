@@ -99,6 +99,19 @@ rotate-keys: ## Rotate the signing key without a redeploy
 audit: ## Tail the security audit trail
 	$(COMPOSE) exec app authforge-admin audit tail --limit 25
 
+# ------------------------------------------------------------------ staging one-offs
+# These use `aws ecs run-task` against the existing Fargate task definition, private
+# subnets, and ecs-sg (same path as the service). Values come from terraform output.
+TF_STAGING ?= infra/envs/staging
+
+.PHONY: migrate-staging
+migrate-staging: ## Run alembic upgrade head as a one-off staging Fargate task
+	./scripts/run-ecs-oneoff.sh $(TF_STAGING) -- alembic upgrade head
+
+.PHONY: bootstrap-keys-staging
+bootstrap-keys-staging: ## Create the first signing key in staging (idempotent; run after migrate)
+	./scripts/run-ecs-oneoff.sh $(TF_STAGING) -- authforge-admin keys init
+
 # ------------------------------------------------------------------ quality
 .PHONY: lint
 lint: ## Check formatting, lint rules and types

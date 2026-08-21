@@ -49,3 +49,9 @@ variable "ecs_service_name" {
   description = "ECS service name CI may deploy to."
   type        = string
 }
+
+variable "create_github_oidc_provider" {
+  description = "Create the GitHub Actions OIDC provider in this account. Set false only if it already exists and is managed elsewhere (import instead)."
+  type        = bool
+  default     = true
+}

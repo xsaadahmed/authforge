@@ -13,6 +13,11 @@ output "issuer" {
   value       = "https://${module.alb.alb_dns_name}"
 }
 
+output "aws_region" {
+  description = "AWS region for this environment."
+  value       = var.aws_region
+}
+
 output "ecs_cluster_name" {
   description = "ECS cluster name."
   value       = module.ecs.cluster_name
@@ -21,6 +26,31 @@ output "ecs_cluster_name" {
 output "ecs_service_name" {
   description = "ECS service name."
   value       = module.ecs.service_name
+}
+
+output "ecs_task_definition_arn" {
+  description = "ECS task definition ARN (use for one-off run-task)."
+  value       = module.ecs.task_definition_arn
+}
+
+output "ecs_container_name" {
+  description = "Container name inside the ECS task definition."
+  value       = module.ecs.container_name
+}
+
+output "ecs_log_group_name" {
+  description = "CloudWatch log group for ECS tasks."
+  value       = module.ecs.log_group_name
+}
+
+output "private_subnet_ids" {
+  description = "Private subnet IDs for ECS tasks."
+  value       = module.vpc.private_subnet_ids
+}
+
+output "ecs_security_group_id" {
+  description = "Security group ID for ECS tasks."
+  value       = module.security_groups.ecs_security_group_id
 }
 
 output "ecr_repository_url" {

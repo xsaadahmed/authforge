@@ -215,13 +215,9 @@ resource "aws_ecs_task_definition" "this" {
         }
       }
 
-      healthCheck = {
-        command     = ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:${var.container_port}/health', timeout=2).status == 200 else 1)\""]
-        interval    = 30
-        timeout     = 5
-        retries     = 3
-        startPeriod = 30
-      }
+      # No container healthCheck: ALB target-group checks cover the service, and the same
+      # task definition is reused for one-off admin/migrate run-task overrides (those never
+      # bind :8000, so a container healthCheck would kill them mid-command).
     }
   ])
 

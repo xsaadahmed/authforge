@@ -34,6 +34,10 @@ LABEL org.opencontainers.image.title="AuthForge" \
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH" \
+    # Source is copied to WORKDIR rather than installed into the venv (keeps the dependency
+    # layer cacheable). Put WORKDIR on sys.path so console scripts like authforge-admin can
+    # import `app` the same way `uvicorn app.main:app` does.
+    PYTHONPATH="/srv/authforge" \
     # Off by default: the app reads configuration from the environment, and ECS injects secrets from
     # Secrets Manager into the task at launch.
     AUTHFORGE_ENVIRONMENT=prod

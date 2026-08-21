@@ -347,7 +347,23 @@ def list_keys() -> None:
 
 @keys_app.command("init")
 def init_keys() -> None:
-    """Create the first signing key if the deployment has none. Idempotent."""
+    """Create the first signing key if the deployment has none. Idempotent.
+
+    Prefer this over ``keys rotate`` on a brand-new environment: it is a no-op when a
+    current key already exists. ``keys rotate`` also works with zero keys (it simply
+    creates the first ``current`` key), but is the wrong verb for bootstrap because a
+    second call would demote the first key to ``retiring``.
+    """
+
+    async def operation(container: Container) -> str:
+        return await container.keys.ensure_initialized()
+
+    typer.secho(f"current signing key: {_run(operation)}", fg=typer.colors.GREEN)
+
+
+@keys_app.command("bootstrap")
+def bootstrap_keys() -> None:
+    """Alias of ``keys init`` — create the first signing key when none exist."""
 
     async def operation(container: Container) -> str:
         return await container.keys.ensure_initialized()

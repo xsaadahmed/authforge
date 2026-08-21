@@ -2,8 +2,11 @@
 
 Migrations run synchronously (psycopg via the plain ``postgresql://`` URL) even though the
 application is async: a migration is a one-shot administrative task, and a synchronous driver
-keeps the tooling simple and its failures obvious. The URL comes from the app's ``Settings`` so
-there is one source of truth for connection strings.
+keeps the tooling simple and its failures obvious. The URL comes from the app's ``Settings``
+(``AUTHFORGE_DATABASE_URL``) so there is one source of truth for connection strings.
+
+The URL is never written into Alembic's ConfigParser-backed config: passwords often contain
+URL-encoded ``%XX`` sequences, and ConfigParser treats ``%`` as interpolation syntax.
 """
 
 from __future__ import annotations
@@ -11,7 +14,7 @@ from __future__ import annotations
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 
 from app.config import get_settings
 from app.models import Base
@@ -21,12 +24,14 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
-config.set_main_option("sqlalchemy.url", get_settings().sync_database_url())
+
+# Single source of truth — never passed through config.set_main_option / ConfigParser.
+DATABASE_URL = get_settings().sync_database_url()
 
 
 def run_migrations_offline() -> None:
     context.configure(
-        url=config.get_main_option("sqlalchemy.url"),
+        url=DATABASE_URL,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -38,11 +43,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    # Pass the URL straight to the engine — do not round-trip through Alembic's ini/ConfigParser.
+    connectable = create_engine(DATABASE_URL, poolclass=pool.NullPool)
     with connectable.connect() as connection:
         context.configure(
             connection=connection,

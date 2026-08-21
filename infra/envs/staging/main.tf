@@ -79,13 +79,14 @@ module "ecr" {
 module "rds" {
   source = "../../modules/rds"
 
-  environment         = var.environment
-  project             = var.project
-  subnet_ids          = module.vpc.private_subnet_ids
-  security_group_ids  = [module.security_groups.rds_security_group_id]
-  skip_final_snapshot = true
-  deletion_protection = false
-  multi_az            = false
+  environment             = var.environment
+  project                 = var.project
+  subnet_ids              = module.vpc.private_subnet_ids
+  security_group_ids      = [module.security_groups.rds_security_group_id]
+  skip_final_snapshot     = true
+  deletion_protection     = false
+  multi_az                = false
+  backup_retention_period = 1
 
   depends_on = [module.security_groups]
 }
@@ -190,6 +191,4 @@ module "github_oidc" {
   ecr_repository_arn = module.ecr.repository_arn
   ecs_cluster_name   = module.ecs.cluster_name
   ecs_service_name   = module.ecs.service_name
-
-  depends_on = [module.ecr, module.ecs]
 }
