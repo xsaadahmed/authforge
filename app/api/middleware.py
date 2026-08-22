@@ -6,9 +6,10 @@ import time
 from collections.abc import Awaitable, Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
-from starlette.types import ASGIApp
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.config import Settings
 from app.core.context import reset_request_context, set_request_context
@@ -133,6 +134,25 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
             headers["Pragma"] = "no-cache"
         return response
+
+
+class TrustedHostExceptHealthMiddleware:
+    """Host-header checks for application traffic, but not for ALB/ECS probes.
+
+    ALB target-group health checks send ``Host: <task-ip>:<port>``, which is never the
+    issuer hostname. Rejecting that with 400 makes every task look unhealthy and the
+    deployment never stabilizes.
+    """
+
+    def __init__(self, app: ASGIApp, allowed_hosts: list[str]) -> None:
+        self.app = app
+        self._trusted = TrustedHostMiddleware(app, allowed_hosts=allowed_hosts)
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope.get("path") in ("/health", "/ready"):
+            await self.app(scope, receive, send)
+            return
+        await self._trusted(scope, receive, send)
 
 
 def _is_sensitive(path: str) -> bool:

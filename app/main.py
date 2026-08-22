@@ -12,13 +12,16 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import RedirectResponse, Response
 from starlette.status import HTTP_303_SEE_OTHER
 
 from app import __version__
 from app.api.error_handlers import register_error_handlers
-from app.api.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
+from app.api.middleware import (
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+    TrustedHostExceptHealthMiddleware,
+)
 from app.api.routers import (
     account,
     admin,
@@ -98,7 +101,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # arriving with a forged Host must not be able to influence what we advertise or to poison
         # a cache with a rewritten authorization endpoint.
         app.add_middleware(
-            TrustedHostMiddleware, allowed_hosts=[_issuer_host(resolved), "localhost"]
+            TrustedHostExceptHealthMiddleware,
+            allowed_hosts=[_issuer_host(resolved), "localhost"],
         )
 
     register_error_handlers(app)
