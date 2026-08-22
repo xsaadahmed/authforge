@@ -177,12 +177,11 @@ jobs:
 
       - name: Build and push
         run: |
+          # ECR tags are immutable; never retag `latest`.
           docker build -f docker/Dockerfile \
             -t "${{ steps.meta.outputs.repository }}:${{ steps.meta.outputs.image_tag }}" \
-            -t "${{ steps.meta.outputs.repository }}:latest" \
             .
           docker push "${{ steps.meta.outputs.repository }}:${{ steps.meta.outputs.image_tag }}"
-          docker push "${{ steps.meta.outputs.repository }}:latest"
 
   terraform-apply-and-deploy:
     name: terraform-apply-and-deploy
