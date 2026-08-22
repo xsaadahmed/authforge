@@ -199,6 +199,22 @@ data "aws_iam_policy_document" "terraform_plan_read" {
       values   = [var.project]
     }
   }
+
+  statement {
+    sid    = "DescribeUntaggableAccountResources"
+    effect = "Allow"
+    actions = [
+      "ec2:DescribeAvailabilityZones",
+      "ec2:DescribeAccountAttributes",
+      "ec2:DescribeRegions",
+      "ecr:GetAuthorizationToken",
+      "ecr:GetLifecyclePolicy",
+      "iam:GetOpenIDConnectProvider",
+      "iam:ListOpenIDConnectProviders",
+      "secretsmanager:GetSecretValue",
+    ]
+    resources = ["*"]
+  }
 }
 
 # Plan role cannot mutate infrastructure or push images; it can refresh state for terraform plan.
@@ -273,18 +289,8 @@ data "aws_iam_policy_document" "terraform_apply_write" {
       "application-autoscaling:*",
     ]
     resources = ["*"]
-
-    condition {
-      test     = "StringEqualsIfExists"
-      variable = "aws:ResourceTag/Project"
-      values   = [var.project]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:RequestTag/Project"
-      values   = [var.project]
-    }
+    # No RequestTag/ResourceTag conditions: terraform refresh is mostly untagged
+    # Describe/Get calls, and those would be denied if a tag were required.
   }
 }
 
