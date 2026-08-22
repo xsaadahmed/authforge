@@ -20,7 +20,7 @@ from app.services.rate_limit import RateLimitService
 from app.stores.rate_limit_store import RateLimitStore
 from app.stores.token_denylist import TokenDenylistStore
 from tests.conftest import Seeded
-from tests.helpers import full_flow_tokens, login
+from tests.helpers import full_flow_tokens
 
 pytestmark = pytest.mark.integration
 
@@ -88,7 +88,9 @@ async def test_login_fails_cleanly_when_redis_is_unreachable(
     original = container.redis._client
     container.redis._client = _broken_redis()
     try:
-        response = await login(app_client, seeded)
+        # GET /login itself needs Redis (CSRF). Do not use the login() helper, which asserts
+        # that the form renders 200 before posting credentials.
+        response = await app_client.get("/login")
         assert response.status_code in (400, 500, 503)
         assert app_client.cookies.get("authforge_session") is None
         # An internal error must not leak a stack trace or a driver message to the caller.

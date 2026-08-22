@@ -39,6 +39,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         # value is length-capped because it is echoed back and stored in audit rows.
         incoming = request.headers.get(REQUEST_ID_HEADER)
         request_id = (incoming or new_identifier())[:64]
+        request.state.request_id = request_id
         tokens = set_request_context(
             request_id=request_id,
             client_ip=self._client_ip(request),

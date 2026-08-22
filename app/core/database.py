@@ -87,6 +87,8 @@ class Database:
     @asynccontextmanager
     async def session(self) -> AsyncIterator[AsyncSession]:
         """A unit of work: commit on success, roll back on any exception."""
+        if self._engine is None:
+            raise RuntimeError("database not connected; call connect() during startup")
         async with self.sessionmaker() as session:
             try:
                 yield session

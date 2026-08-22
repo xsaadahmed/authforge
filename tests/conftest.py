@@ -167,7 +167,7 @@ async def api(test_settings: Settings) -> AsyncIterator[Api]:
     await startup(built, ensure_signing_key=True)
     application.state.container = built
     async with AsyncClient(
-        transport=ASGITransport(app=application),
+        transport=ASGITransport(app=application, raise_app_exceptions=False),
         base_url=test_settings.issuer,
         follow_redirects=False,
     ) as client:

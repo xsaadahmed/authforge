@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from redis.exceptions import RedisError
 from starlette.responses import JSONResponse, Response
 
 from app.core.errors import (
@@ -73,17 +74,36 @@ def register_error_handlers(app: FastAPI) -> None:
             headers={"Cache-Control": "no-store"},
         )
 
+    @app.exception_handler(RedisError)
+    async def _redis_error(request: Request, exc: RedisError) -> Response:
+        # Redis is an availability dependency. A driver error must never become a stack trace
+        # in the HTTP response (or an unhandled exception that ASGI transports re-raise).
+        logger.error("redis unavailable", exc_info=exc, extra={"http_path": request.url.path})
+        request_id = getattr(request.state, "request_id", None)
+        headers = {"X-Request-ID": request_id} if request_id else {}
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": str(OAuthErrorCode.TEMPORARILY_UNAVAILABLE),
+                "error_description": "temporarily unavailable",
+            },
+            headers=headers,
+        )
+
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception) -> Response:
         # Logged with a stack trace (redacted by the formatter) but answered opaquely: internal
         # detail in an error body is reconnaissance material.
         logger.error("unhandled exception", exc_info=exc, extra={"http_path": request.url.path})
+        request_id = getattr(request.state, "request_id", None)
+        headers = {"X-Request-ID": request_id} if request_id else {}
         return JSONResponse(
             status_code=500,
             content={
                 "error": str(OAuthErrorCode.SERVER_ERROR),
                 "error_description": "an unexpected error occurred",
             },
+            headers=headers,
         )
 
 

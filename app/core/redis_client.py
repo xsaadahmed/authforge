@@ -7,12 +7,15 @@ enough to exhaust the ECS task's worker capacity.
 
 from __future__ import annotations
 
+import inspect
 from typing import Any, cast
 
 import redis.asyncio as redis
 from redis.asyncio.client import Redis
+from redis.exceptions import RedisError
 
 from app.config import Settings
+from app.core.errors import TemporarilyUnavailableError
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -76,4 +79,19 @@ class _LazyRedisProxy:
         self._provider = provider
 
     def __getattr__(self, item: str) -> Any:
-        return getattr(self._provider.client, item)
+        attr = getattr(self._provider.client, item)
+        if not callable(attr):
+            return attr
+        if not inspect.iscoroutinefunction(attr):
+            return attr
+
+        async def _guarded(*args: Any, **kwargs: Any) -> Any:
+            try:
+                return await attr(*args, **kwargs)
+            except RedisError as exc:
+                # Redis is an availability dependency for sessions/CSRF. Surface it as an
+                # OAuth ``temporarily_unavailable`` so the caller sees a clean 503 instead of
+                # a driver traceback (and so TestClient/ASGITransport do not re-raise).
+                raise TemporarilyUnavailableError("temporarily unavailable") from exc
+
+        return _guarded
