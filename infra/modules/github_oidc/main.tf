@@ -17,15 +17,17 @@ locals {
   ecs_cluster_arn = "arn:${data.aws_partition.current.partition}:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${var.ecs_cluster_name}"
   ecs_service_arn = "arn:${data.aws_partition.current.partition}:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:service/${var.ecs_cluster_name}/${var.ecs_service_name}"
 
-  # GitHub's `sub` varies by trigger: `ref:refs/heads/main` on a push, `environment:staging`
-  # when the job uses `environment:`, `pull_request` on a PR. StringLike keeps the trust
-  # scoped to this repository without enumerating every claim shape.
+  # GitHub's `sub` is `repo:owner/name:...` historically, and
+  # `repo:owner@orgId/name@repoId:...` when unique IDs are included (current default).
+  # Match both, still scoped to this repository.
   plan_trust_subjects = [
     "repo:${var.github_repository}:*",
+    "repo:${replace(var.github_repository, "/", "@*/")}@*:*",
   ]
 
   apply_trust_subjects = [
     "repo:${var.github_repository}:*",
+    "repo:${replace(var.github_repository, "/", "@*/")}@*:*",
   ]
 }
 
