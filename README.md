@@ -487,6 +487,11 @@ RDS and Redis stay private (reachable only from `ecs-sg`). Do **not** open them 
    make bootstrap-keys-staging
    ```
    On a brand-new environment run **`authforge-admin keys init`** (what `make bootstrap-keys-staging` calls). Prefer `keys init` / `keys bootstrap` over `keys rotate` for the first key: `rotate` works with zero keys, but a second rotate would demote the first key to `retiring`.
+6. **Seed a k6 client and user** (after the image with `seed-loadtest` is deployed):
+   ```bash
+   make seed-loadtest-staging
+   ```
+   The one-off task logs JSON plus an `export CLIENT_ID=...` line. Copy those into the shell, set `BASE_URL` to the staging ALB URL (`terraform -chdir=infra/envs/staging output -raw alb_url`), then `make loadtest-token` and `make loadtest-refresh`.
 
 One-off tasks reuse the service task definition with a `command` override via `aws ecs run-task`; cluster / task definition / subnets / security group / log group come from `terraform output`, not hardcoded values.
 

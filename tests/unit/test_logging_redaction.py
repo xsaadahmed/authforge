@@ -11,7 +11,7 @@ import logging
 
 import pytest
 
-from app.core.logging import JsonFormatter, redact_text, redact_value
+from app.core.logging import JsonFormatter, configure_logging, redact_text, redact_value
 
 A_JWT = (
     "eyJhbGciOiJSUzI1NiIsImtpZCI6ImFiYyJ9."
@@ -113,6 +113,15 @@ def test_formatter_redacts_extra_fields() -> None:
     payload = json.loads(formatter.format(record))
     assert payload["refresh_token"] == "***"
     assert payload["jti"] == "01HZJTI"
+
+
+def test_sqlalchemy_engine_logger_is_quiet_outside_local() -> None:
+    """Bound SQL parameters must not ride along at INFO in staging/prod CloudWatch."""
+    configure_logging(level="INFO", environment="staging")
+    assert logging.getLogger("sqlalchemy.engine").level == logging.WARNING
+    assert logging.getLogger("sqlalchemy.engine.Engine").level == logging.WARNING
+    configure_logging(level="INFO", environment="local")
+    assert logging.getLogger("sqlalchemy.engine").level == logging.INFO
 
 
 def test_formatter_redacts_exception_text() -> None:

@@ -28,7 +28,7 @@ from app.repositories.audit_repository import AuditRepository
 from app.repositories.client_repository import ClientRepository
 from app.repositories.scope_repository import ScopeRepository
 from app.repositories.user_repository import UserRepository
-from app.security.passwords import PasswordHasherService
+from app.security.passwords import PasswordHasherService, PasswordPolicyError
 
 app = typer.Typer(help="AuthForge administration.", no_args_is_help=True, add_completion=False)
 clients_app = typer.Typer(help="Register and manage OAuth clients.", no_args_is_help=True)
@@ -247,7 +247,14 @@ def disable_client(client_id: Annotated[str, typer.Argument()]) -> None:
 @users_app.command("create")
 def create_user(
     email: Annotated[str, typer.Option(help="Login email")],
-    password: Annotated[str, typer.Option(prompt=True, hide_input=True, confirmation_prompt=True)],
+    password: Annotated[
+        str | None,
+        typer.Option(
+            "--password",
+            help="Plaintext password. Prefer this over the prompt when running non-interactively "
+            "(e.g. an ECS one-off task).",
+        ),
+    ] = None,
     full_name: Annotated[str | None, typer.Option()] = None,
     admin: Annotated[bool, typer.Option("--admin", help="Grant the admin flag")] = False,
     verified: Annotated[
@@ -256,9 +263,13 @@ def create_user(
 ) -> None:
     """Create a user with an Argon2id-hashed password.
 
-    The password is prompted rather than passed as an argument so it does not land in shell
-    history or in a process listing.
+    Interactive use prompts for the password. Pass ``--password`` for non-interactive
+    admin tasks (ECS run-task); that value will appear in the task command list, so use
+    it only for synthetic accounts.
     """
+
+    if password is None:
+        password = typer.prompt("Password", hide_input=True, confirmation_prompt=True)
 
     async def operation(container: Container) -> dict[str, object]:
         hasher = PasswordHasherService(container.settings)
@@ -432,6 +443,108 @@ def tail_audit(
             ]
 
     _echo_json(_run(operation))
+
+
+@app.command("seed-loadtest")
+def seed_loadtest(
+    email: Annotated[str, typer.Option(help="Load-test user email")] = "loadtest@authforge.test",
+    password: Annotated[
+        str, typer.Option(help="Load-test user password (synthetic account only)")
+    ] = "LoadtestPassw0rd!",  # noqa: S107 — synthetic k6 account, not a real credential
+    client_id: Annotated[str, typer.Option(help="OAuth client_id for k6")] = "k6-loadtest",
+    redirect_uri: Annotated[
+        str, typer.Option(help="Registered redirect URI (must match k6 REDIRECT_URI)")
+    ] = "https://rp.example.test/callback",
+    client_name: Annotated[str, typer.Option()] = "k6 load test",
+) -> None:
+    """Create (or reset) a confidential client and a test user for k6.
+
+    Idempotent: re-running rotates the client secret and resets the user password, then prints
+    the values k6 needs. Intended for staging one-off tasks, not production.
+    """
+
+    async def operation(container: Container) -> dict[str, object]:
+        hasher = PasswordHasherService(container.settings)
+        try:
+            hasher.validate_policy(password)
+        except PasswordPolicyError as exc:
+            raise DomainError(str(exc)) from exc
+        scope_names = [name for name, *_ in DEFAULT_SCOPES]
+        async with container.database.session() as session:
+            scope_repo = ScopeRepository(session)
+            for name, description, is_oidc, is_default in DEFAULT_SCOPES:
+                await scope_repo.upsert(
+                    name=name, description=description, is_oidc=is_oidc, is_default=is_default
+                )
+
+            clients = ClientRepository(session)
+            existing = await clients.get_by_client_id(client_id)
+            if existing is None:
+                result = await container.clients.register_client(
+                    session,
+                    client_name=client_name,
+                    client_type=ClientType.CONFIDENTIAL,
+                    redirect_uris=[redirect_uri],
+                    allowed_scopes=scope_names,
+                    client_id=client_id,
+                    require_consent=False,
+                    allow_refresh_tokens=True,
+                )
+                issued_secret = result.client_secret
+                await container.audit.record_in_transaction(
+                    session,
+                    AuditEventType.CLIENT_CREATED,
+                    client_id=client_id,
+                    detail={"client_name": client_name, "via": "cli-seed-loadtest"},
+                )
+            else:
+                issued_secret = await container.clients.rotate_client_secret(
+                    session, client_id=client_id
+                )
+
+            users = UserRepository(session)
+            user = await users.get_by_email(email)
+            if user is None:
+                user = await users.create(
+                    email=email,
+                    password_hash=hasher.hash(password),
+                    full_name="k6 load test",
+                    email_verified=True,
+                    is_admin=False,
+                )
+                await container.audit.record_in_transaction(
+                    session,
+                    AuditEventType.USER_CREATED,
+                    user_id=user.id,
+                    detail={"via": "cli-seed-loadtest"},
+                )
+            else:
+                await users.set_password_hash(user.id, hasher.hash(password))
+                await users.clear_lockout(user.id)
+
+            return {
+                "client_id": client_id,
+                "client_secret": issued_secret,
+                "user_email": user.email,
+                "user_password": password,
+                "redirect_uri": redirect_uri,
+            }
+
+    payload = _run(operation)
+    _echo_json(payload)
+    typer.echo("")
+    typer.echo(
+        "export "
+        f"CLIENT_ID={payload['client_id']!s} "
+        f"CLIENT_SECRET={payload['client_secret']!s} "
+        f"USER_EMAIL={payload['user_email']!s} "
+        f"USER_PASSWORD={payload['user_password']!s} "
+        f"REDIRECT_URI={payload['redirect_uri']!s}"
+    )
+    typer.secho(
+        "store these now — the client secret is not kept in plaintext",
+        fg=typer.colors.YELLOW,
+    )
 
 
 @app.command("bootstrap")

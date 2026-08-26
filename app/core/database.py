@@ -53,7 +53,9 @@ class Database:
             pool_recycle=1800,
             pool_pre_ping=True,
             connect_args=connect_args,
-            echo=False,
+            # echo=True is equivalent to sqlalchemy.engine at INFO and prints bound
+            # parameters. Only local development should do that.
+            echo=settings.environment == "local",
         )
         self._sessionmaker = async_sessionmaker(
             bind=self._engine,

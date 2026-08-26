@@ -112,6 +112,20 @@ migrate-staging: ## Run alembic upgrade head as a one-off staging Fargate task
 bootstrap-keys-staging: ## Create the first signing key in staging (idempotent; run after migrate)
 	./scripts/run-ecs-oneoff.sh $(TF_STAGING) -- authforge-admin keys init
 
+# Synthetic k6 account. Password is passed on the task command line — never use a real user.
+LOADTEST_EMAIL ?= loadtest@authforge.test
+LOADTEST_PASSWORD ?= LoadtestPassw0rd!
+LOADTEST_CLIENT_ID ?= k6-loadtest
+LOADTEST_REDIRECT_URI ?= https://rp.example.test/callback
+
+.PHONY: seed-loadtest-staging
+seed-loadtest-staging: ## Create/reset the k6 client+user on staging and print credentials
+	./scripts/run-ecs-oneoff.sh $(TF_STAGING) -- authforge-admin seed-loadtest \
+		--email $(LOADTEST_EMAIL) \
+		--password $(LOADTEST_PASSWORD) \
+		--client-id $(LOADTEST_CLIENT_ID) \
+		--redirect-uri $(LOADTEST_REDIRECT_URI)
+
 # ------------------------------------------------------------------ quality
 .PHONY: lint
 lint: ## Check formatting, lint rules and types

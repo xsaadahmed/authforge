@@ -162,8 +162,12 @@ def configure_logging(*, level: str = "INFO", environment: str = "local") -> Non
     for noisy in ("uvicorn.access",):
         logging.getLogger(noisy).handlers = []
         logging.getLogger(noisy).propagate = False
-    for chatty in ("uvicorn.error", "sqlalchemy.engine"):
-        logging.getLogger(chatty).setLevel(max(logging.INFO, root.level))
+    logging.getLogger("uvicorn.error").setLevel(max(logging.INFO, root.level))
+    # SQLAlchemy logs statements *and bound parameters* at INFO on sqlalchemy.engine.Engine.
+    # That is useful locally and forbidden in staging/prod (secrets in CloudWatch, cost).
+    engine_level = logging.INFO if environment == "local" else logging.WARNING
+    logging.getLogger("sqlalchemy.engine").setLevel(engine_level)
+    logging.getLogger("sqlalchemy.engine.Engine").setLevel(engine_level)
 
 
 def get_logger(name: str) -> logging.Logger:
