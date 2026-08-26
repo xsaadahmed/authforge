@@ -58,8 +58,8 @@ function redirectParams(location) {
 }
 
 function generatePkcePair() {
-  const verifier = encoding.b64encode(crypto.randomBytes(32));
-  const challenge = encoding.b64encode(crypto.sha256(verifier, 'raw'), 'rawurl');
+  const verifier = encoding.b64encode(crypto.randomBytes(32), 'rawurl');
+  const challenge = crypto.sha256(verifier, 'base64rawurl');
   return { verifier, challenge };
 }
 
@@ -67,52 +67,78 @@ function basicAuthHeader() {
   return `Basic ${encoding.b64encode(`${CLIENT_ID}:${CLIENT_SECRET}`)}`;
 }
 
-export default function () {
+function header(response, name) {
+  return response.headers[name] || response.headers[name.toLowerCase()];
+}
+
+function storeCookies(response) {
+  // Staging ALB is HTTP while session cookies are Secure; k6 would otherwise drop them.
+  const raw = header(response, 'Set-Cookie');
+  if (!raw) return;
+  const lines = Array.isArray(raw) ? raw : [raw];
   const jar = http.cookieJar();
+  for (const line of lines) {
+    const nv = String(line).split(';')[0];
+    const eq = nv.indexOf('=');
+    if (eq > 0) jar.set(BASE_URL, nv.slice(0, eq).trim(), nv.slice(eq + 1));
+  }
+}
+
+function resolve(location) {
+  if (!location) return BASE_URL;
+  if (location.startsWith('http://') || location.startsWith('https://')) return location;
+  return `${BASE_URL}${location.startsWith('/') ? '' : '/'}${location}`;
+}
+
+function get(url) {
+  const response = http.get(url, { redirects: 0 });
+  storeCookies(response);
+  return response;
+}
+
+function post(url, body) {
+  const response = http.post(url, body, { redirects: 0 });
+  storeCookies(response);
+  return response;
+}
+
+export default function () {
   const { verifier, challenge } = generatePkcePair();
   const scope = 'openid profile offline_access';
   const authorizeQuery = `response_type=code&client_id=${encodeURIComponent(CLIENT_ID)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(scope)}&code_challenge=${encodeURIComponent(challenge)}&code_challenge_method=S256&state=k6-state`;
 
-  let response = http.get(`${BASE_URL}/authorize?${authorizeQuery}`, { jar });
+  let response = get(`${BASE_URL}/authorize?${authorizeQuery}`);
 
-  if (response.status === 303 && response.headers.Location.includes('/login')) {
-    const next = redirectParams(response.headers.Location).next;
-    const loginPage = http.get(`${BASE_URL}/login?next=${encodeURIComponent(next)}`, { jar });
+  if (response.status === 303 && String(header(response, 'Location') || '').includes('/login')) {
+    const next = redirectParams(header(response, 'Location')).next;
+    const loginPage = get(`${BASE_URL}/login?next=${encodeURIComponent(next || '')}`);
     check(loginPage, { 'login form': (r) => r.status === 200 });
     const loginFields = hiddenFields(loginPage.body);
-    response = http.post(
-      `${BASE_URL}/login`,
-      {
-        identifier: USER_EMAIL,
-        password: USER_PASSWORD,
-        csrf_token: loginFields.csrf_token,
-        next: next || '',
-      },
-      { jar },
-    );
+    response = post(`${BASE_URL}/login`, {
+      identifier: USER_EMAIL,
+      password: USER_PASSWORD,
+      csrf_token: loginFields.csrf_token,
+      next: loginFields.next || next || '',
+    });
     check(response, { 'login redirect': (r) => r.status === 303 });
-    response = http.get(`${BASE_URL}${response.headers.Location}`, { jar });
+    response = get(resolve(header(response, 'Location')));
   }
 
-  if (response.status === 200) {
+  if (response.status === 200 && String(response.body || '').includes('name="csrf_token"')) {
     const consentFields = hiddenFields(response.body);
     const scopes = checkboxScopes(response.body);
-    response = http.post(
-      `${BASE_URL}/consent`,
-      {
-        authorize_query: consentFields.authorize_query,
-        csrf_token: consentFields.csrf_token,
-        decision: 'allow',
-        scope: scopes,
-      },
-      { jar },
-    );
+    response = post(`${BASE_URL}/consent`, {
+      authorize_query: consentFields.authorize_query,
+      csrf_token: consentFields.csrf_token,
+      decision: 'allow',
+      scope: scopes,
+    });
     check(response, { 'consent redirect': (r) => r.status === 303 });
-    response = http.get(`${BASE_URL}${response.headers.Location}`, { jar });
+    response = get(resolve(header(response, 'Location')));
   }
 
   check(response, { 'authorization redirect': (r) => r.status === 303 });
-  const code = redirectParams(response.headers.Location).code;
+  const code = redirectParams(header(response, 'Location') || '').code;
   check(code, { 'authorization code issued': (value) => value && value.length > 0 });
 
   const tokenResponse = http.post(
