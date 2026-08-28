@@ -52,7 +52,28 @@ class Settings(BaseSettings):
     database_statement_timeout_ms: int = Field(default=5_000, ge=0)
 
     redis_url: RedisDsn = Field(default=RedisDsn("redis://localhost:6379/0"))
-    redis_socket_timeout_seconds: float = Field(default=1.0, gt=0)
+    redis_connect_timeout_seconds: float = Field(
+        default=2.0,
+        gt=0,
+        description="TCP + TLS handshake budget for new pool connections (staging uses rediss://).",
+    )
+    redis_command_timeout_seconds: float = Field(
+        default=1.0,
+        gt=0,
+        description="Read/write timeout for commands on already-open connections.",
+    )
+    redis_max_connections: int = Field(
+        default=32,
+        ge=1,
+        le=500,
+        description="Per-process connection pool cap (one Uvicorn worker per ECS task).",
+    )
+    redis_pool_prewarm_connections: int = Field(
+        default=4,
+        ge=0,
+        le=50,
+        description="Parallel PINGs at startup to open pool connections before traffic arrives.",
+    )
 
     # ------------------------------------------------------------------ token policy
     access_token_ttl_seconds: int = Field(default=600, ge=60, le=3600)

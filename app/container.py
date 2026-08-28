@@ -123,6 +123,7 @@ def build_container(settings: Settings) -> Container:
 async def startup(container: Container, *, ensure_signing_key: bool = True) -> None:
     container.database.connect()
     container.redis.connect()
+    await container.redis.warmup_pool()
     if ensure_signing_key:
         # Idempotent and safe to run from every task simultaneously: whichever wins, the others
         # observe a `current` key and do nothing.

@@ -1,12 +1,14 @@
 """Redis client provisioning.
 
-Redis holds only ephemeral state (§13), so short socket timeouts are correct: a slow
-Redis should surface as a fast, observable failure rather than a request that hangs long
-enough to exhaust the ECS task's worker capacity.
+Redis holds only ephemeral state (§13). Command timeouts stay short so a slow Redis surfaces
+as a fast failure rather than pinning ECS workers; connect timeouts are slightly longer to
+cover TCP + TLS on ``rediss://``. The pool is capped so bursts cannot open unbounded
+connections against ElastiCache.
 """
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 from typing import Any, cast
 
@@ -35,12 +37,21 @@ class RedisProvider:
         self._client = redis.from_url(
             str(settings.redis_url),
             decode_responses=True,
-            socket_timeout=settings.redis_socket_timeout_seconds,
-            socket_connect_timeout=settings.redis_socket_timeout_seconds,
+            max_connections=settings.redis_max_connections,
+            socket_timeout=settings.redis_command_timeout_seconds,
+            socket_connect_timeout=settings.redis_connect_timeout_seconds,
             health_check_interval=30,
             retry_on_timeout=False,
         )
-        logger.info("redis client created", extra={"event": "redis_client_created"})
+        logger.info(
+            "redis client created",
+            extra={
+                "event": "redis_client_created",
+                "max_connections": settings.redis_max_connections,
+                "connect_timeout_seconds": settings.redis_connect_timeout_seconds,
+                "command_timeout_seconds": settings.redis_command_timeout_seconds,
+            },
+        )
 
     async def disconnect(self) -> None:
         if self._client is not None:
@@ -63,6 +74,25 @@ class RedisProvider:
         client, so it satisfies the same interface at runtime.
         """
         return cast("Redis", _LazyRedisProxy(self))
+
+    async def warmup_pool(self) -> None:
+        """Open a handful of pool connections before the first request burst."""
+        count = self._settings.redis_pool_prewarm_connections
+        if count <= 0 or self._client is None:
+            return
+        results = await asyncio.gather(
+            *(self._client.ping() for _ in range(count)),
+            return_exceptions=True,
+        )
+        failures = [result for result in results if isinstance(result, Exception)]
+        if failures:
+            logger.warning(
+                "redis pool prewarm incomplete",
+                extra={"requested": count, "failed": len(failures)},
+                exc_info=failures[0],
+            )
+            return
+        logger.info("redis pool prewarmed", extra={"connections": count})
 
     async def healthcheck(self) -> bool:
         try:
