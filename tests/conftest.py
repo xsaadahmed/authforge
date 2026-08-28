@@ -107,6 +107,9 @@ def test_settings(tmp_path_factory: pytest.TempPathFactory) -> Settings:
         # behaviour those tests exist to observe.
         database_pool_size=10,
         database_max_overflow=10,
+        # Datastore integration tests fire 40–50 concurrent Redis commands; keep the production
+        # pool cap but give the suite enough headroom that MaxConnectionsError is not the signal.
+        redis_max_connections=64,
     )
 
 
