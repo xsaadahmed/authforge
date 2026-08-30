@@ -1,0 +1,41 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+     execution: local
+        script: loadtest/k6/token_exchange.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 1 max VUs, 10m30s max duration (incl. graceful stop):
+              * default: 1 iterations for each of 1 VUs (maxDuration: 10m0s, gracefulStop: 30s)
+
+
+     ✓ login form
+     ✓ login redirect
+     ✓ authorization redirect
+     ✓ authorization code issued
+     ✓ token exchange 200
+     ✓ access token present
+
+     checks.........................: 100.00% 6 out of 6
+     data_received..................: 7.9 kB  8.5 kB/s
+     data_sent......................: 2.5 kB  2.7 kB/s
+     http_req_blocked...............: avg=14.02ms  min=0s       med=0s       max=70.1ms   p(90)=42.06ms  p(95)=56.08ms 
+     http_req_connecting............: avg=4.07ms   min=0s       med=0s       max=20.38ms  p(90)=12.23ms  p(95)=16.31ms 
+     http_req_duration..............: avg=169.1ms  min=40.7ms   med=102.09ms max=549.97ms p(90)=370.93ms p(95)=460.45ms
+       { expected_response:true }...: avg=169.1ms  min=40.7ms   med=102.09ms max=549.97ms p(90)=370.93ms p(95)=460.45ms
+     http_req_failed................: 0.00%   0 out of 5
+     http_req_receiving.............: avg=1.7ms    min=0s       med=1.51ms   max=3.59ms   p(90)=3.13ms   p(95)=3.36ms  
+     http_req_sending...............: avg=0s       min=0s       med=0s       max=0s       p(90)=0s       p(95)=0s      
+     http_req_tls_handshaking.......: avg=0s       min=0s       med=0s       max=0s       p(90)=0s       p(95)=0s      
+     http_req_waiting...............: avg=167.4ms  min=38.25ms  med=101.14ms max=548.46ms p(90)=370.02ms p(95)=459.24ms
+     http_reqs......................: 5       5.438407/s
+     iteration_duration.............: avg=919.38ms min=919.38ms med=919.38ms max=919.38ms p(90)=919.38ms p(95)=919.38ms
+     iterations.....................: 1       1.087681/s
+
+
+running (00m00.9s), 0/1 VUs, 1 complete and 0 interrupted iterations
+default ✓ [ 100% ] 1 VUs  00m00.9s/10m0s  1/1 iters, 1 per VU

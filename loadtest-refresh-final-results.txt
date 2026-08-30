@@ -1,0 +1,183 @@
+C:/Users/xsaad/Documents/authforge/.tools/k6-v0.54.0-windows-amd64/k6.exe run loadtest/k6/refresh_rotation.js
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+     execution: local
+        script: loadtest/k6/refresh_rotation.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 10 max VUs, 55s max duration (incl. graceful stop):
+              * concurrent_refresh: 10 looping VUs for 45s (gracefulStop: 10s)
+
+
+running (01.0s), 10/10 VUs, 0 complete and 0 interrupted iterations
+concurrent_refresh   [   2% ] 10 VUs  01.0s/45s
+
+running (02.0s), 10/10 VUs, 0 complete and 0 interrupted iterations
+concurrent_refresh   [   4% ] 10 VUs  02.0s/45s
+
+running (03.0s), 10/10 VUs, 0 complete and 0 interrupted iterations
+concurrent_refresh   [   7% ] 10 VUs  03.0s/45s
+
+running (04.0s), 10/10 VUs, 2 complete and 0 interrupted iterations
+concurrent_refresh   [   9% ] 10 VUs  04.0s/45s
+
+running (05.0s), 10/10 VUs, 6 complete and 0 interrupted iterations
+concurrent_refresh   [  11% ] 10 VUs  05.0s/45s
+
+running (06.0s), 10/10 VUs, 10 complete and 0 interrupted iterations
+concurrent_refresh   [  13% ] 10 VUs  06.0s/45s
+
+running (07.0s), 10/10 VUs, 10 complete and 0 interrupted iterations
+concurrent_refresh   [  16% ] 10 VUs  07.0s/45s
+
+running (08.0s), 10/10 VUs, 10 complete and 0 interrupted iterations
+concurrent_refresh   [  18% ] 10 VUs  08.0s/45s
+
+running (09.0s), 10/10 VUs, 10 complete and 0 interrupted iterations
+concurrent_refresh   [  20% ] 10 VUs  09.0s/45s
+
+running (10.0s), 10/10 VUs, 14 complete and 0 interrupted iterations
+concurrent_refresh   [  22% ] 10 VUs  10.0s/45s
+
+running (11.0s), 10/10 VUs, 16 complete and 0 interrupted iterations
+concurrent_refresh   [  24% ] 10 VUs  11.0s/45s
+
+running (12.0s), 10/10 VUs, 18 complete and 0 interrupted iterations
+concurrent_refresh   [  27% ] 10 VUs  12.0s/45s
+
+running (13.0s), 10/10 VUs, 21 complete and 0 interrupted iterations
+concurrent_refresh   [  29% ] 10 VUs  13.0s/45s
+
+running (14.0s), 10/10 VUs, 22 complete and 0 interrupted iterations
+concurrent_refresh   [  31% ] 10 VUs  14.0s/45s
+
+running (15.0s), 10/10 VUs, 23 complete and 0 interrupted iterations
+concurrent_refresh   [  33% ] 10 VUs  15.0s/45s
+
+running (16.0s), 10/10 VUs, 25 complete and 0 interrupted iterations
+concurrent_refresh   [  36% ] 10 VUs  16.0s/45s
+
+running (17.0s), 10/10 VUs, 25 complete and 0 interrupted iterations
+concurrent_refresh   [  38% ] 10 VUs  17.0s/45s
+
+running (18.0s), 10/10 VUs, 28 complete and 0 interrupted iterations
+concurrent_refresh   [  40% ] 10 VUs  18.0s/45s
+
+running (19.0s), 10/10 VUs, 31 complete and 0 interrupted iterations
+concurrent_refresh   [  42% ] 10 VUs  19.0s/45s
+
+running (20.0s), 10/10 VUs, 31 complete and 0 interrupted iterations
+concurrent_refresh   [  44% ] 10 VUs  20.0s/45s
+
+running (21.0s), 10/10 VUs, 33 complete and 0 interrupted iterations
+concurrent_refresh   [  47% ] 10 VUs  21.0s/45s
+
+running (22.0s), 10/10 VUs, 36 complete and 0 interrupted iterations
+concurrent_refresh   [  49% ] 10 VUs  22.0s/45s
+
+running (23.0s), 10/10 VUs, 36 complete and 0 interrupted iterations
+concurrent_refresh   [  51% ] 10 VUs  23.0s/45s
+
+running (24.0s), 10/10 VUs, 36 complete and 0 interrupted iterations
+concurrent_refresh   [  53% ] 10 VUs  24.0s/45s
+
+running (25.0s), 10/10 VUs, 36 complete and 0 interrupted iterations
+concurrent_refresh   [  56% ] 10 VUs  25.0s/45s
+
+running (26.0s), 10/10 VUs, 40 complete and 0 interrupted iterations
+concurrent_refresh   [  58% ] 10 VUs  26.0s/45s
+
+running (27.0s), 10/10 VUs, 43 complete and 0 interrupted iterations
+concurrent_refresh   [  60% ] 10 VUs  27.0s/45s
+
+running (28.0s), 10/10 VUs, 46 complete and 0 interrupted iterations
+concurrent_refresh   [  62% ] 10 VUs  28.0s/45s
+
+running (29.0s), 10/10 VUs, 46 complete and 0 interrupted iterations
+concurrent_refresh   [  64% ] 10 VUs  29.0s/45s
+
+running (30.0s), 10/10 VUs, 48 complete and 0 interrupted iterations
+concurrent_refresh   [  67% ] 10 VUs  30.0s/45s
+
+running (31.0s), 10/10 VUs, 53 complete and 0 interrupted iterations
+concurrent_refresh   [  69% ] 10 VUs  31.0s/45s
+
+running (32.0s), 10/10 VUs, 55 complete and 0 interrupted iterations
+concurrent_refresh   [  71% ] 10 VUs  32.0s/45s
+
+running (33.0s), 10/10 VUs, 56 complete and 0 interrupted iterations
+concurrent_refresh   [  73% ] 10 VUs  33.0s/45s
+
+running (34.0s), 10/10 VUs, 57 complete and 0 interrupted iterations
+concurrent_refresh   [  76% ] 10 VUs  34.0s/45s
+
+running (35.0s), 10/10 VUs, 57 complete and 0 interrupted iterations
+concurrent_refresh   [  78% ] 10 VUs  35.0s/45s
+
+running (36.0s), 10/10 VUs, 58 complete and 0 interrupted iterations
+concurrent_refresh   [  80% ] 10 VUs  36.0s/45s
+
+running (37.0s), 10/10 VUs, 64 complete and 0 interrupted iterations
+concurrent_refresh   [  82% ] 10 VUs  37.0s/45s
+
+running (38.0s), 10/10 VUs, 65 complete and 0 interrupted iterations
+concurrent_refresh   [  84% ] 10 VUs  38.0s/45s
+
+running (39.0s), 10/10 VUs, 67 complete and 0 interrupted iterations
+concurrent_refresh   [  87% ] 10 VUs  39.0s/45s
+
+running (40.0s), 10/10 VUs, 70 complete and 0 interrupted iterations
+concurrent_refresh   [  89% ] 10 VUs  40.0s/45s
+
+running (41.0s), 10/10 VUs, 71 complete and 0 interrupted iterations
+concurrent_refresh   [  91% ] 10 VUs  41.0s/45s
+
+running (42.0s), 10/10 VUs, 71 complete and 0 interrupted iterations
+concurrent_refresh   [  93% ] 10 VUs  42.0s/45s
+
+running (43.0s), 10/10 VUs, 72 complete and 0 interrupted iterations
+concurrent_refresh   [  96% ] 10 VUs  43.0s/45s
+
+running (44.0s), 10/10 VUs, 78 complete and 0 interrupted iterations
+concurrent_refresh   [  98% ] 10 VUs  44.0s/45s
+
+running (45.0s), 10/10 VUs, 78 complete and 0 interrupted iterations
+concurrent_refresh   [ 100% ] 10 VUs  45.0s/45s
+
+running (46.0s), 06/10 VUs, 82 complete and 0 interrupted iterations
+concurrent_refresh ↓ [ 100% ] 10 VUs  45s
+
+running (47.0s), 06/10 VUs, 82 complete and 0 interrupted iterations
+concurrent_refresh ↓ [ 100% ] 10 VUs  45s
+
+     ✗ issued refresh token
+      ↳  98% — ✓ 87 / ✗ 1
+     ✓ refresh status 200 or 400
+
+     checks.........................: 99.80% 522 out of 523
+     data_received..................: 1.1 MB 24 kB/s
+     data_sent......................: 423 kB 8.9 kB/s
+     http_req_blocked...............: avg=2.44ms   min=0s      med=0s       p(90)=0s     p(95)=18.77ms  p(99)=82.03ms  max=454.15ms
+     http_req_connecting............: avg=1.23ms   min=0s      med=0s       p(90)=0s     p(95)=18.77ms  p(99)=24.24ms  max=33.53ms 
+     http_req_duration..............: avg=792.39ms min=24.19ms med=572.79ms p(90)=1.87s  p(95)=2.43s    p(99)=3.23s    max=3.73s   
+       { expected_response:true }...: avg=704.92ms min=24.19ms med=340.86ms p(90)=1.9s   p(95)=2.53s    p(99)=3.18s    max=3.73s   
+     http_req_failed................: 39.88% 349 out of 875
+     http_req_receiving.............: avg=12.35ms  min=0s      med=2.78ms   p(90)=9.61ms p(95)=16.87ms  p(99)=504.68ms max=1.1s    
+     http_req_sending...............: avg=39.06µs  min=0s      med=0s       p(90)=0s     p(95)=508.13µs p(99)=647.9µs  max=1.2ms   
+     http_req_tls_handshaking.......: avg=0s       min=0s      med=0s       p(90)=0s     p(95)=0s       p(99)=0s       max=0s      
+     http_req_waiting...............: avg=779.99ms min=20.29ms med=547.32ms p(90)=1.86s  p(95)=2.41s    p(99)=3.23s    max=3.73s   
+     http_reqs......................: 875    18.379144/s
+     iteration_duration.............: avg=5.31s    min=2.67s   med=5.36s    p(90)=6.93s  p(95)=7.75s    p(99)=8.24s    max=8.53s   
+     iterations.....................: 88     1.848417/s
+     refresh_token_duration.........: avg=800.42ms min=40.6ms  med=721.81ms p(90)=1.75s  p(95)=2.03s    p(99)=2.78s    max=3.72s   
+     vus............................: 6      min=6          max=10
+     vus_max........................: 10     min=10         max=10
+
+
+running (47.6s), 00/10 VUs, 88 complete and 0 interrupted iterations
+concurrent_refresh ✓ [ 100% ] 10 VUs  45s

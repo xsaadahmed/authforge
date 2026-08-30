@@ -8,6 +8,8 @@
  *   USER_EMAIL        — Resource owner email
  *   USER_PASSWORD     — Resource owner password
  *   REDIRECT_URI      — Registered redirect URI (default: https://rp.example.test/callback)
+ *   TOKEN_VUS         — Constant VUs (default: 15)
+ *   TOKEN_DURATION     — Sustained duration (default: 45s)
  */
 
 import http from 'k6/http';
@@ -15,8 +17,20 @@ import { check } from 'k6';
 import encoding from 'k6/encoding';
 import crypto from 'k6/crypto';
 
+const TOKEN_VUS = Number(__ENV.TOKEN_VUS || 15);
+const TOKEN_DURATION = __ENV.TOKEN_DURATION || '45s';
+
 // PLACEHOLDER (spec §24): thresholds to be defined after the first real staging run.
 export const options = {
+  scenarios: {
+    token_exchange: {
+      executor: 'constant-vus',
+      vus: TOKEN_VUS,
+      duration: TOKEN_DURATION,
+      gracefulStop: '10s',
+    },
+  },
+  summaryTrendStats: ['avg', 'min', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
   thresholds: {},
 };
 

@@ -1,0 +1,189 @@
+C:/Users/xsaad/Documents/authforge/.tools/k6-v0.54.0-windows-amd64/k6.exe run loadtest/k6/token_exchange.js
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+     execution: local
+        script: loadtest/k6/token_exchange.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 15 max VUs, 55s max duration (incl. graceful stop):
+              * token_exchange: 15 looping VUs for 45s (gracefulStop: 10s)
+
+
+running (01.0s), 15/15 VUs, 0 complete and 0 interrupted iterations
+token_exchange   [   2% ] 15 VUs  01.0s/45s
+
+running (02.0s), 15/15 VUs, 0 complete and 0 interrupted iterations
+token_exchange   [   4% ] 15 VUs  02.0s/45s
+
+running (03.0s), 15/15 VUs, 0 complete and 0 interrupted iterations
+token_exchange   [   7% ] 15 VUs  03.0s/45s
+
+running (04.0s), 15/15 VUs, 0 complete and 0 interrupted iterations
+token_exchange   [   9% ] 15 VUs  04.0s/45s
+
+running (05.0s), 15/15 VUs, 1 complete and 0 interrupted iterations
+token_exchange   [  11% ] 15 VUs  05.0s/45s
+
+running (06.0s), 15/15 VUs, 3 complete and 0 interrupted iterations
+token_exchange   [  13% ] 15 VUs  06.0s/45s
+
+running (07.0s), 15/15 VUs, 6 complete and 0 interrupted iterations
+token_exchange   [  16% ] 15 VUs  07.0s/45s
+
+running (08.0s), 15/15 VUs, 9 complete and 0 interrupted iterations
+token_exchange   [  18% ] 15 VUs  08.0s/45s
+
+running (09.0s), 15/15 VUs, 12 complete and 0 interrupted iterations
+token_exchange   [  20% ] 15 VUs  09.0s/45s
+
+running (10.0s), 15/15 VUs, 16 complete and 0 interrupted iterations
+token_exchange   [  22% ] 15 VUs  10.0s/45s
+
+running (11.0s), 15/15 VUs, 20 complete and 0 interrupted iterations
+token_exchange   [  24% ] 15 VUs  11.0s/45s
+
+running (12.0s), 15/15 VUs, 23 complete and 0 interrupted iterations
+token_exchange   [  27% ] 15 VUs  12.0s/45s
+
+running (13.0s), 15/15 VUs, 28 complete and 0 interrupted iterations
+token_exchange   [  29% ] 15 VUs  13.0s/45s
+
+running (14.0s), 15/15 VUs, 28 complete and 0 interrupted iterations
+token_exchange   [  31% ] 15 VUs  14.0s/45s
+
+running (15.0s), 15/15 VUs, 30 complete and 0 interrupted iterations
+token_exchange   [  33% ] 15 VUs  15.0s/45s
+
+running (16.0s), 15/15 VUs, 32 complete and 0 interrupted iterations
+token_exchange   [  36% ] 15 VUs  16.0s/45s
+
+running (17.0s), 15/15 VUs, 33 complete and 0 interrupted iterations
+token_exchange   [  38% ] 15 VUs  17.0s/45s
+
+running (18.0s), 15/15 VUs, 37 complete and 0 interrupted iterations
+token_exchange   [  40% ] 15 VUs  18.0s/45s
+
+running (19.0s), 15/15 VUs, 41 complete and 0 interrupted iterations
+token_exchange   [  42% ] 15 VUs  19.0s/45s
+
+running (20.0s), 15/15 VUs, 45 complete and 0 interrupted iterations
+token_exchange   [  44% ] 15 VUs  20.0s/45s
+
+running (21.0s), 15/15 VUs, 45 complete and 0 interrupted iterations
+token_exchange   [  47% ] 15 VUs  21.0s/45s
+
+running (22.0s), 15/15 VUs, 49 complete and 0 interrupted iterations
+token_exchange   [  49% ] 15 VUs  22.0s/45s
+
+running (23.0s), 15/15 VUs, 52 complete and 0 interrupted iterations
+token_exchange   [  51% ] 15 VUs  23.0s/45s
+
+running (24.0s), 15/15 VUs, 53 complete and 0 interrupted iterations
+token_exchange   [  53% ] 15 VUs  24.0s/45s
+
+running (25.0s), 15/15 VUs, 56 complete and 0 interrupted iterations
+token_exchange   [  56% ] 15 VUs  25.0s/45s
+
+running (26.0s), 15/15 VUs, 58 complete and 0 interrupted iterations
+token_exchange   [  58% ] 15 VUs  26.0s/45s
+
+running (27.0s), 15/15 VUs, 61 complete and 0 interrupted iterations
+token_exchange   [  60% ] 15 VUs  27.0s/45s
+
+running (28.0s), 15/15 VUs, 68 complete and 0 interrupted iterations
+token_exchange   [  62% ] 15 VUs  28.0s/45s
+
+running (29.0s), 15/15 VUs, 72 complete and 0 interrupted iterations
+token_exchange   [  64% ] 15 VUs  29.0s/45s
+
+running (30.0s), 15/15 VUs, 75 complete and 0 interrupted iterations
+token_exchange   [  67% ] 15 VUs  30.0s/45s
+
+running (31.0s), 15/15 VUs, 75 complete and 0 interrupted iterations
+token_exchange   [  69% ] 15 VUs  31.0s/45s
+
+running (32.0s), 15/15 VUs, 75 complete and 0 interrupted iterations
+token_exchange   [  71% ] 15 VUs  32.0s/45s
+
+running (33.0s), 15/15 VUs, 75 complete and 0 interrupted iterations
+token_exchange   [  73% ] 15 VUs  33.0s/45s
+
+running (34.0s), 15/15 VUs, 78 complete and 0 interrupted iterations
+token_exchange   [  76% ] 15 VUs  34.0s/45s
+
+running (35.0s), 15/15 VUs, 80 complete and 0 interrupted iterations
+token_exchange   [  78% ] 15 VUs  35.0s/45s
+
+running (36.0s), 15/15 VUs, 80 complete and 0 interrupted iterations
+token_exchange   [  80% ] 15 VUs  36.0s/45s
+
+running (37.0s), 15/15 VUs, 86 complete and 0 interrupted iterations
+token_exchange   [  82% ] 15 VUs  37.0s/45s
+
+running (38.0s), 15/15 VUs, 87 complete and 0 interrupted iterations
+token_exchange   [  84% ] 15 VUs  38.0s/45s
+
+running (39.0s), 15/15 VUs, 88 complete and 0 interrupted iterations
+token_exchange   [  87% ] 15 VUs  39.0s/45s
+
+running (40.0s), 15/15 VUs, 96 complete and 0 interrupted iterations
+token_exchange   [  89% ] 15 VUs  40.0s/45s
+
+running (41.0s), 15/15 VUs, 99 complete and 0 interrupted iterations
+token_exchange   [  91% ] 15 VUs  41.0s/45s
+
+running (42.0s), 15/15 VUs, 100 complete and 0 interrupted iterations
+token_exchange   [  93% ] 15 VUs  42.0s/45s
+
+running (43.0s), 15/15 VUs, 101 complete and 0 interrupted iterations
+token_exchange   [  96% ] 15 VUs  43.0s/45s
+
+running (44.0s), 15/15 VUs, 102 complete and 0 interrupted iterations
+token_exchange   [  98% ] 15 VUs  44.0s/45s
+
+running (45.0s), 15/15 VUs, 105 complete and 0 interrupted iterations
+token_exchange   [ 100% ] 15 VUs  45.0s/45s
+
+running (46.0s), 14/15 VUs, 106 complete and 0 interrupted iterations
+token_exchange ↓ [ 100% ] 15 VUs  45s
+
+running (47.0s), 13/15 VUs, 107 complete and 0 interrupted iterations
+token_exchange ↓ [ 100% ] 15 VUs  45s
+
+     ✓ login form
+     ✓ login redirect
+     ✗ authorization redirect
+      ↳  99% — ✓ 119 / ✗ 1
+     ✗ authorization code issued
+      ↳  99% — ✓ 119 / ✗ 1
+     ✗ token exchange 200
+      ↳  99% — ✓ 119 / ✗ 1
+     ✗ access token present
+      ↳  99% — ✓ 119 / ✗ 1
+
+     checks.........................: 99.44% 716 out of 720
+     data_received..................: 941 kB 20 kB/s
+     data_sent......................: 297 kB 6.2 kB/s
+     http_req_blocked...............: avg=1.4ms    min=0s      med=0s       p(90)=0s     p(95)=0s       p(99)=56.95ms  max=57.51ms 
+     http_req_connecting............: avg=609.83µs min=0s      med=0s       p(90)=0s     p(95)=0s       p(99)=24.68ms  max=24.68ms 
+     http_req_duration..............: avg=1.18s    min=28.54ms med=676.62ms p(90)=2.89s  p(95)=4.14s    p(99)=5.84s    max=8.84s   
+       { expected_response:true }...: avg=1.18s    min=28.54ms med=676.62ms p(90)=2.9s   p(95)=4.14s    p(99)=5.84s    max=8.84s   
+     http_req_failed................: 0.33%  2 out of 600
+     http_req_receiving.............: avg=12.53ms  min=0s      med=1.82ms   p(90)=7.76ms p(95)=10.8ms   p(99)=522.79ms max=594.02ms
+     http_req_sending...............: avg=95.69µs  min=0s      med=0s       p(90)=0s     p(95)=541.27µs p(99)=724.38µs max=16.24ms 
+     http_req_tls_handshaking.......: avg=0s       min=0s      med=0s       p(90)=0s     p(95)=0s       p(99)=0s       max=0s      
+     http_req_waiting...............: avg=1.16s    min=22.7ms  med=674.36ms p(90)=2.89s  p(95)=4.13s    p(99)=5.84s    max=8.84s   
+     http_reqs......................: 600    12.587911/s
+     iteration_duration.............: avg=5.91s    min=2.13s   med=5.8s     p(90)=8.32s  p(95)=9.41s    p(99)=10.09s   max=10.96s  
+     iterations.....................: 120    2.517582/s
+     vus............................: 13     min=13         max=15
+     vus_max........................: 15     min=15         max=15
+
+
+running (47.7s), 00/15 VUs, 120 complete and 0 interrupted iterations
+token_exchange ✓ [ 100% ] 15 VUs  45s

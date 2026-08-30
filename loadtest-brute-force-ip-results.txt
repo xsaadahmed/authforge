@@ -1,0 +1,118 @@
+=== login rate-limit drill: phase=ip ===
+base_url=http://af-stg2026082009050001550000000f-1311982025.us-east-1.elb.amazonaws.com
+started_utc=2026-08-29T22:00:42Z
+
+fake_accounts=nouser-drill-NN@example.test
+attempts=31 (expect invalid_credentials on 1-30, rate_limited on 31+)
+
+attempt=01 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-01@example.test
+attempt=02 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-02@example.test
+attempt=03 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-03@example.test
+attempt=04 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-04@example.test
+attempt=05 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-05@example.test
+attempt=06 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-06@example.test
+attempt=07 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-07@example.test
+attempt=08 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-08@example.test
+attempt=09 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-09@example.test
+attempt=10 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-10@example.test
+attempt=11 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-11@example.test
+attempt=12 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-12@example.test
+attempt=13 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-13@example.test
+attempt=14 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-14@example.test
+attempt=15 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-15@example.test
+attempt=16 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-16@example.test
+attempt=17 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-17@example.test
+attempt=18 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-18@example.test
+attempt=19 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-19@example.test
+attempt=20 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-20@example.test
+attempt=21 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-21@example.test
+attempt=22 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-22@example.test
+attempt=23 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-23@example.test
+attempt=24 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-24@example.test
+attempt=25 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-25@example.test
+attempt=26 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-26@example.test
+attempt=27 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-27@example.test
+attempt=28 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-28@example.test
+attempt=29 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-29@example.test
+attempt=30 http=200 class=invalid_credentials retry_after= identifier=nouser-drill-30@example.test
+attempt=31 http=200 class=rate_limited retry_after=265 identifier=nouser-drill-31@example.test
+
+finished_utc=2026-08-29T22:01:18Z
+
+--- CloudWatch verification (/ecs/authforge-staging) ---
+
+Use Logs Insights with a window covering:
+  2026-08-29T22:00:42Z  ->  2026-08-29T22:01:18Z  (add ~1 minute slack on each side)
+
+1) Account phase — login_failure events should climb (10 allowed failures before throttle):
+   fields @timestamp, event, outcome, detail, request_id
+   | filter message = "security event"
+   | filter event = "login_failure"
+   | filter @timestamp >= "2026-08-29T22:00:42Z"
+   | sort @timestamp asc
+
+   Expect ~10 rows (attempts 1-10). Attempts 11+ do not emit login_failure because the
+   rate limiter short-circuits before credential verification.
+
+2) Account phase — account throttle (attempt 11 or 12):
+   fields @timestamp, event, outcome, detail, request_id
+   | filter message = "security event"
+   | filter event = "rate_limit_exceeded"
+   | filter detail.scope = "login"
+   | filter @timestamp >= "2026-08-29T22:00:42Z"
+   | sort @timestamp asc
+
+   Expect >= 1 row. detail.retry_after_seconds should be present.
+   Correlate with the script line class=rate_limited (HTTP 200, not 429).
+
+   Optional corroboration from the limiter itself:
+   fields @timestamp, message, limit_scope, limit, window_seconds
+   | filter message = "rate limit exceeded"
+   | filter limit_scope = "login_account"
+   | filter @timestamp >= "2026-08-29T22:00:42Z"
+   | sort @timestamp asc
+
+3) IP phase — login_failure on many distinct fake accounts:
+   fields @timestamp, event, outcome, detail, request_id
+   | filter message = "security event"
+   | filter event = "login_failure"
+   | filter @timestamp >= "2026-08-29T22:00:42Z"
+   | sort @timestamp asc
+
+   Expect ~30 rows (one per fake username through attempt 30).
+
+4) IP phase — IP throttle (attempt 31):
+   fields @timestamp, event, outcome, detail, request_id
+   | filter message = "security event"
+   | filter event = "rate_limit_exceeded"
+   | filter detail.scope = "login"
+   | filter @timestamp >= "2026-08-29T22:00:42Z"
+   | sort @timestamp asc
+
+   Expect >= 1 row on the IP phase run. Script attempt 31 should show class=rate_limited.
+
+   Optional corroboration:
+   fields @timestamp, message, limit_scope, limit, window_seconds
+   | filter message = "rate limit exceeded"
+   | filter limit_scope = "login_ip"
+   | filter @timestamp >= "2026-08-29T22:00:42Z"
+   | sort @timestamp asc
+
+5) Account phase only — durable lockout audit (Postgres lockout fires on the 10th failure
+   even though the UI still shows the generic wrong-password message):
+   fields @timestamp, event, outcome, detail, request_id
+   | filter message = "security event"
+   | filter event = "account_locked"
+   | filter @timestamp >= "2026-08-29T22:00:42Z"
+   | sort @timestamp asc
+
+   Expect 1 row near the 10th failed attempt.
+
+CLI one-liner (replace START/END):
+  aws logs start-query --log-group-name /ecs/authforge-staging \
+    --start-time $(date -u -d 'START' +%s) --end-time $(date -u -d 'END' +%s) \
+    --query-string 'fields @timestamp, event, message, detail, limit_scope | filter message in ["security event", "rate limit exceeded"] | sort @timestamp asc'
+
+After the account drill, the load-test user may have failed_login_count elevated. A successful
+login or `authforge-admin` user unlock clears Redis counters; wait 300s before the IP phase
+if both are run from the same workstation.

@@ -1,0 +1,21 @@
+=== login rate-limit drill: phase=account ===
+base_url=http://af-stg2026082009050001550000000f-1311982025.us-east-1.elb.amazonaws.com
+started_utc=2026-08-29T21:54:45Z
+
+target_account=loadtest@authforge.test
+attempts=12 (expect invalid_credentials on 1-10, rate_limited on 11+)
+
+attempt=01 http=200 class=invalid_credentials retry_after= identifier=loadtest@authforge.test
+attempt=02 http=200 class=invalid_credentials retry_after= identifier=loadtest@authforge.test
+attempt=03 http=200 class=invalid_credentials retry_after= identifier=loadtest@authforge.test
+attempt=04 http=200 class=invalid_credentials retry_after= identifier=loadtest@authforge.test
+attempt=05 http=200 class=invalid_credentials retry_after= identifier=loadtest@authforge.test
+attempt=06 http=200 class=invalid_credentials retry_after= identifier=loadtest@authforge.test
+attempt=07 http=200 class=invalid_credentials retry_after= identifier=loadtest@authforge.test
+attempt=08 http=200 class=invalid_credentials retry_after= identifier=loadtest@authforge.test
+attempt=09 http=200 class=invalid_credentials retry_after= identifier=loadtest@authforge.test
+attempt=10 http=200 class=invalid_credentials retry_after= identifier=loadtest@authforge.test
+attempt=11 http=200 class=rate_limited retry_after=288 identifier=loadtest@authforge.test
+attempt=12 http=200 class=rate_limited retry_after=287 identifier=loadtest@authforge.test
+
+finished_utc=2026-08-29T21:55:06Z
