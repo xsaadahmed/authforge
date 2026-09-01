@@ -1,0 +1,22 @@
+graph TB
+    subgraph pub["Public subnets"]
+        ALB["Application Load Balancer"]
+    end
+    subgraph priv["Private subnets"]
+        ECS["ECS Fargate"]
+        RDS[("RDS PostgreSQL")]
+        CACHE[("ElastiCache Redis")]
+    end
+    subgraph plat["AWS platform"]
+        ECR["ECR"]
+        SM["Secrets Manager"]
+        CW["CloudWatch and SNS"]
+    end
+    GH["GitHub Actions via OIDC"] --> ECR
+    GH --> ECS
+    ECR --> ECS
+    SM --> ECS
+    ALB --> ECS
+    ECS --> RDS
+    ECS --> CACHE
+    ECS --> CW
