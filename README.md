@@ -8,23 +8,23 @@ AuthForge is a from-scratch OAuth 2.0 / OpenID Connect identity provider — not
 
 ```mermaid
 flowchart TB
-  subgraph public["Public subnets"]
-    ALB["Application Load Balancer"]
+  subgraph public [Public subnets]
+    ALB[Application Load Balancer]
   end
 
-  subgraph private["Private subnets"]
-    ECS["ECS Fargate\n(≥2 tasks)"]
-    RDS[("RDS PostgreSQL")]
-    Redis[("ElastiCache Redis")]
+  subgraph private [Private subnets]
+    ECS[ECS Fargate - 2+ tasks]
+    RDS[(RDS PostgreSQL)]
+    Redis[(ElastiCache Redis)]
   end
 
-  subgraph aws["AWS platform"]
-    ECR["ECR"]
-    SM["Secrets Manager"]
-    CW["CloudWatch / SNS"]
+  subgraph aws [AWS platform]
+    ECR[ECR]
+    SM[Secrets Manager]
+    CW[CloudWatch and SNS]
   end
 
-  GH["GitHub Actions\n(OIDC → AWS)"] --> ECR
+  GH[GitHub Actions via OIDC] --> ECR
   GH --> ECS
   ECR --> ECS
   SM --> ECS
