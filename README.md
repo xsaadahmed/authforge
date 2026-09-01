@@ -7,31 +7,28 @@ AuthForge is a from-scratch OAuth 2.0 / OpenID Connect identity provider — not
 ## Architecture
 
 ```mermaid
-flowchart TB
-  subgraph public [Public subnets]
-    ALB[Application Load Balancer]
-  end
-
-  subgraph private [Private subnets]
-    ECS[ECS Fargate - 2+ tasks]
-    RDS[(RDS PostgreSQL)]
-    Redis[(ElastiCache Redis)]
-  end
-
-  subgraph aws [AWS platform]
-    ECR[ECR]
-    SM[Secrets Manager]
-    CW[CloudWatch and SNS]
-  end
-
-  GH[GitHub Actions via OIDC] --> ECR
-  GH --> ECS
-  ECR --> ECS
-  SM --> ECS
-  ALB --> ECS
-  ECS --> RDS
-  ECS --> Redis
-  ECS --> CW
+graph TB
+    subgraph pub["Public subnets"]
+        ALB["Application Load Balancer"]
+    end
+    subgraph priv["Private subnets"]
+        ECS["ECS Fargate"]
+        RDS[("RDS PostgreSQL")]
+        CACHE[("ElastiCache Redis")]
+    end
+    subgraph plat["AWS platform"]
+        ECR["ECR"]
+        SM["Secrets Manager"]
+        CW["CloudWatch and SNS"]
+    end
+    GH["GitHub Actions via OIDC"] --> ECR
+    GH --> ECS
+    ECR --> ECS
+    SM --> ECS
+    ALB --> ECS
+    ECS --> RDS
+    ECS --> CACHE
+    ECS --> CW
 ```
 
 Traffic enters through the ALB, terminates on ECS Fargate tasks (desired count ≥ 2 in staging), and reaches PostgreSQL for durable state and Redis for ephemeral state (sessions, auth codes, rate limits). Container images live in ECR; signing keys, database credentials, and other secrets are pulled from Secrets Manager. Terraform provisions VPC, subnets, security groups, and all of the above. CI builds and pushes images, runs `terraform apply`, and smoke-tests staging — authenticated to AWS with GitHub OIDC, not static access keys.
