@@ -19,6 +19,18 @@ variable "github_repository" {
   type        = string
 }
 
+variable "github_owner_id" {
+  description = "Numeric GitHub owner id embedded in immutable OIDC subjects. Leave empty to trust only the name-based subject."
+  type        = string
+  default     = ""
+}
+
+variable "github_repository_id" {
+  description = "Numeric GitHub repository id embedded in immutable OIDC subjects. Leave empty to trust only the name-based subject."
+  type        = string
+  default     = ""
+}
+
 variable "state_bucket_name" {
   description = "Terraform remote state S3 bucket name."
   type        = string

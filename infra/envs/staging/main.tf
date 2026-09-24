@@ -181,14 +181,16 @@ module "observability" {
 module "github_oidc" {
   source = "../../modules/github_oidc"
 
-  environment        = var.environment
-  project            = var.project
-  aws_region         = var.aws_region
-  github_repository  = var.github_repository
-  state_bucket_name  = var.terraform_state_bucket_name
-  state_key_prefix   = "staging/"
-  lock_table_name    = var.terraform_lock_table_name
-  ecr_repository_arn = module.ecr.repository_arn
-  ecs_cluster_name   = module.ecs.cluster_name
-  ecs_service_name   = module.ecs.service_name
+  environment          = var.environment
+  project              = var.project
+  aws_region           = var.aws_region
+  github_repository    = var.github_repository
+  github_owner_id      = "175816860"
+  github_repository_id = "1337648511"
+  state_bucket_name    = var.terraform_state_bucket_name
+  state_key_prefix     = "staging/"
+  lock_table_name      = var.terraform_lock_table_name
+  ecr_repository_arn   = module.ecr.repository_arn
+  ecs_cluster_name     = module.ecs.cluster_name
+  ecs_service_name     = module.ecs.service_name
 }

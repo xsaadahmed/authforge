@@ -17,18 +17,23 @@ locals {
   ecs_cluster_arn = "arn:${data.aws_partition.current.partition}:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${var.ecs_cluster_name}"
   ecs_service_arn = "arn:${data.aws_partition.current.partition}:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:service/${var.ecs_cluster_name}/${var.ecs_service_name}"
 
-  # GitHub's `sub` is `repo:owner/name:...` historically, and
-  # `repo:owner@orgId/name@repoId:...` when unique IDs are included (current default).
-  # Match both, still scoped to this repository.
-  plan_trust_subjects = [
-    "repo:${var.github_repository}:*",
-    "repo:${replace(var.github_repository, "/", "@*/")}@*:*",
-  ]
+  github_owner = split("/", var.github_repository)[0]
+  github_name  = split("/", var.github_repository)[1]
 
-  apply_trust_subjects = [
+  # Name-based subject, plus the immutable subject GitHub now sends:
+  # repo:owner@ownerId/name@repoId:ref:refs/heads/main
+  # A glob such as repo:owner@*/name@*:* does not match. IAM StringLike
+  # wildcards do not backtrack, so the first * consumes the rest of the claim.
+  immutable_oidc_subject = (
+    var.github_owner_id != "" && var.github_repository_id != ""
+    ? "repo:${local.github_owner}@${var.github_owner_id}/${local.github_name}@${var.github_repository_id}:*"
+    : ""
+  )
+
+  oidc_trust_subjects = compact([
     "repo:${var.github_repository}:*",
-    "repo:${replace(var.github_repository, "/", "@*/")}@*:*",
-  ]
+    local.immutable_oidc_subject,
+  ])
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
@@ -70,7 +75,7 @@ data "aws_iam_policy_document" "plan_assume" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = local.plan_trust_subjects
+      values   = local.oidc_trust_subjects
     }
   }
 }
@@ -95,7 +100,7 @@ data "aws_iam_policy_document" "apply_assume" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = local.apply_trust_subjects
+      values   = local.oidc_trust_subjects
     }
   }
 }
