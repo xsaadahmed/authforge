@@ -211,17 +211,45 @@ jobs:
           terraform apply -auto-approve -input=false \
             -var="image_tag=${{ needs.build-and-push.outputs.image_tag }}"
 
-      - name: Force ECS deployment
+      - name: Wait for ECS deployment
         run: |
+          set -euo pipefail
           CLUSTER="$(terraform -chdir=${{ env.TF_DIR }} output -raw ecs_cluster_name)"
           SERVICE="$(terraform -chdir=${{ env.TF_DIR }} output -raw ecs_service_name)"
-          aws ecs update-service \
+          # terraform apply already registers a new task definition and starts a
+          # rolling deployment. A second --force-new-deployment overlaps that
+          # rollout; with minimumHealthyPercent=100 the service never reaches
+          # steady state inside the default 10-minute waiter.
+          echo "Waiting for ${CLUSTER}/${SERVICE} to finish the Terraform rollout."
+          deadline=$((SECONDS + 1200))
+          while (( SECONDS < deadline )); do
+            svc="$(aws ecs describe-services \
+              --cluster "${CLUSTER}" \
+              --services "${SERVICE}" \
+              --output json)"
+            state="$(echo "${svc}" | jq -r '.services[0].deployments[] | select(.status=="PRIMARY") | .rolloutState')"
+            reason="$(echo "${svc}" | jq -r '.services[0].deployments[] | select(.status=="PRIMARY") | .rolloutStateReason')"
+            extra="$(echo "${svc}" | jq '[.services[0].deployments[] | select(.status!="PRIMARY")] | length')"
+            echo "${svc}" | jq -c '.services[0] | {desired: .desiredCount, running: .runningCount, pending: .pendingCount, primary: (.deployments[] | select(.status=="PRIMARY") | {rolloutState, runningCount, pendingCount, failedTasks}), otherDeployments: ([.deployments[] | select(.status!="PRIMARY")] | length)}'
+            echo "${state}: ${reason}"
+            if [[ "${state}" == "COMPLETED" && "${extra}" == "0" ]]; then
+              echo "Service is stable."
+              exit 0
+            fi
+            if [[ "${state}" == "FAILED" ]]; then
+              echo "ECS deployment failed: ${reason}"
+              echo "${svc}" | jq '.services[0].events[:8]'
+              exit 1
+            fi
+            sleep 15
+          done
+          echo "Timed out waiting for the ECS service to stabilize."
+          aws ecs describe-services \
             --cluster "${CLUSTER}" \
-            --service "${SERVICE}" \
-            --force-new-deployment
-          aws ecs wait services-stable \
-            --cluster "${CLUSTER}" \
-            --services "${SERVICE}"
+            --services "${SERVICE}" \
+            --query 'services[0].events[:12]' \
+            --output json
+          exit 1
 
   smoke-test:
     name: smoke-test
